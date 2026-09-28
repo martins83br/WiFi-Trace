@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Networks | WiFi-Trace</title>
+
+<style>
+body {
+    margin: 0;
+    background: #0b1118;
+    color: #e6edf3;
+    font-family: Arial, Helvetica, sans-serif;
+}
+
+.sidebar {
+    position: fixed;
+    width: 230px;
+    height: 100vh;
+    background: #101820;
+    border-right: 1px solid #263241;
+}
+
+.logo {
+    padding: 28px;
+    font-size: 25px;
+    font-weight: bold;
+}
+
+.logo span { color: #39d98a; }
+
+.menu { padding: 15px 25px; }
+
+.menu a {
+    display: block;
+    padding: 13px 0;
+    color: #9aa7b4;
+    text-decoration: none;
+}
+
+.menu a:hover,
+.menu .active {
+    color: #39d98a;
+}
+
+.content {
+    margin-left: 230px;
+    padding: 40px;
+}
+
+.title {
+    font-size: 30px;
+    font-weight: bold;
+}
+
+.subtitle {
+    color: #8b98a5;
+    margin-top: 6px;
+}
+
+.panel {
+    margin-top: 30px;
+    background: #111b26;
+    border: 1px solid #243241;
+    border-radius: 10px;
+    padding: 25px;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+th {
+    text-align: left;
+    color: #8996a3;
+    padding: 14px;
+    border-bottom: 1px solid #263241;
+}
+
+td {
+    padding: 14px;
+    border-bottom: 1px solid #1d2935;
+}
+
+.password {
+    font-family: monospace;
+}
+
+button {
+    background: #162635;
+    color: #39d98a;
+    border: 1px solid #31516b;
+    border-radius: 6px;
+    padding: 7px 13px;
+    cursor: pointer;
+}
+
+button:hover {
+    background: #1d3345;
+}
+
+.status {
+    color: #8996a3;
+    font-size: 13px;
+}
+
+.warning {
+    margin-top: 20px;
+    color: #8996a3;
+    font-size: 13px;
+}
+</style>
+</head>
+
+<body>
+
+<div class="sidebar">
+    <div class="logo">WiFi<span>-Trace</span></div>
+
+    <div class="menu">
+        <a href="/">▣ Overview</a>
+        <a href="/networks" class="active">◉ Networks</a>
+        <a href="#">◈ Devices</a>
+        <a href="#">⌚ Timeline</a>
+        <a href="#">⚠ Security</a>
+        <a href="#">◇ Investigations</a>
+        <a href="#">▤ Evidence</a>
+        <a href="#">▧ Reports</a>
+    </div>
+</div>
+
+<div class="content">
+
+    <div class="title">Saved Wi-Fi Networks</div>
+    <div class="subtitle">
+        Networks stored on this computer
+    </div>
+
+    <div class="panel">
+
+        <table>
+            <thead>
+                <tr>
+                    <th>SSID</th>
+                    <th>Password</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+
+            <tbody>
+            {% for network in networks %}
+                <tr>
+                    <td>{{ network.ssid }}</td>
+
+                    <td>
+                        <span
+                            class="password"
+                            id="password-{{ loop.index }}"
+                        >••••••••</span>
+                    </td>
+
+                    <td>
+                        <button
+                            id="button-{{ loop.index }}"
+                            onclick='togglePassword({{ loop.index }}, {{ network.ssid | tojson }})'
+                        >
+                            Reveal
+                        </button>
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+
+        <div class="warning">
+            Passwords are requested only when Reveal is selected.
+            WiFi-Trace does not store revealed credentials.
+        </div>
+
+    </div>
+</div>
+
+<script>
+async function togglePassword(index, ssid) {
+
+    const field = document.getElementById(`password-${index}`);
+    const button = document.getElementById(`button-${index}`);
+
+    if (button.dataset.visible === "true") {
+        field.textContent = "••••••••";
+        button.textContent = "Reveal";
+        button.dataset.visible = "false";
+        return;
+    }
+
+    field.textContent = "Requesting access...";
+    button.disabled = true;
+
+    try {
+        const response = await fetch(
+            `/api/networks/password?ssid=${encodeURIComponent(ssid)}`,
+            {
+                method: "GET",
+                cache: "no-store"
+            }
+        );
+
+        const data = await response.json();
+
+        if (!response.ok || !data.available) {
+            field.textContent = "Unavailable";
+            button.textContent = "Reveal";
+            button.dataset.visible = "false";
+            return;
+        }
+
+        field.textContent = data.password;
+        button.textContent = "Hide";
+        button.dataset.visible = "true";
+
+    } catch (error) {
+        field.textContent = "Error";
+    } finally {
+        button.disabled = false;
+    }
+}
+</script>
+
+</body>
+</html>
