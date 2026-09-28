@@ -10,6 +10,44 @@ DATA_DIR = PROJECT_ROOT / "data"
 DATABASE_PATH = DATA_DIR / "wifi_trace.db"
 
 
+
+def valid_signal(value):
+    """Return a valid Wi-Fi RSSI value or None."""
+    try:
+        value = int(value)
+    except (TypeError, ValueError):
+        return None
+
+    return value if -100 <= value <= -1 else None
+
+
+def valid_noise(value):
+    """Return a valid Wi-Fi noise-floor value or None."""
+    try:
+        value = int(value)
+    except (TypeError, ValueError):
+        return None
+
+    return value if -120 <= value <= -1 else None
+
+
+def calculate_snr(signal, noise):
+    """Calculate SNR only from valid radio telemetry."""
+    signal = valid_signal(signal)
+    noise = valid_noise(noise)
+
+    if signal is None or noise is None:
+        return None
+
+    snr = signal - noise
+
+    # Defensive sanity check.
+    if not 0 <= snr <= 100:
+        return None
+
+    return snr
+
+
 TRACKED_FIELDS = {
     "gateway": "Gateway",
     "interface": "Interface",
@@ -140,6 +178,13 @@ def _event_severity(field: str, old_value: Any, new_value: Any) -> str:
 
 def save_snapshot(network: dict) -> dict:
     init_database()
+
+    # Work on a copy so collectors cannot accidentally persist invalid
+    # radio telemetry into forensic history.
+    network = dict(network)
+
+    network["signal"] = valid_signal(network.get("signal"))
+    network["noise"] = valid_noise(network.get("noise"))
 
     observed_at = utc_now()
     previous = get_latest_snapshot()
@@ -465,13 +510,12 @@ def get_snapshot(snapshot_id: int) -> dict | None:
     except json.JSONDecodeError:
         item["dns_servers"] = []
 
-    signal = item.get("signal")
-    noise = item.get("noise")
-
-    if isinstance(signal, int) and isinstance(noise, int):
-        item["snr"] = signal - noise
-    else:
-        item["snr"] = None
+    item["signal"] = valid_signal(item.get("signal"))
+    item["noise"] = valid_noise(item.get("noise"))
+    item["snr"] = calculate_snr(
+        item.get("signal"),
+        item.get("noise"),
+    )
 
     return item
 
