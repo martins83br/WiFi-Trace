@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Network Time Machine | WiFi-Trace</title>
+
+<style>
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    background: #0b1118;
+    color: #dce7f3;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+a {
+    color: inherit;
+    text-decoration: none;
+}
+
+.layout {
+    min-height: 100vh;
+    display: grid;
+    grid-template-columns: 230px 1fr;
+}
+
+.sidebar {
+    background: #101820;
+    border-right: 1px solid #22303d;
+    padding: 24px 16px;
+}
+
+.brand {
+    color: #39d98a;
+    font-size: 22px;
+    font-weight: 700;
+    margin: 0 10px 6px;
+}
+
+.subtitle {
+    color: #6f8192;
+    font-size: 11px;
+    margin: 0 10px 28px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.nav-item {
+    display: block;
+    padding: 11px 12px;
+    border-radius: 7px;
+    margin-bottom: 5px;
+    color: #9fb0c0;
+}
+
+.nav-item:hover,
+.nav-item.active {
+    background: #172430;
+    color: #39d98a;
+}
+
+.main {
+    padding: 34px;
+    max-width: 1450px;
+}
+
+.header {
+    display: flex;
+    justify-content: space-between;
+    gap: 20px;
+    align-items: flex-start;
+    margin-bottom: 26px;
+}
+
+h1 {
+    margin: 0 0 7px;
+    font-size: 28px;
+}
+
+.description {
+    color: #7f91a3;
+    margin: 0;
+}
+
+.badge {
+    display: inline-block;
+    color: #39d98a;
+    background: #12251d;
+    border: 1px solid #24563d;
+    border-radius: 20px;
+    padding: 8px 13px;
+    font-size: 12px;
+    font-weight: 650;
+}
+
+.control-panel {
+    background: #111b26;
+    border: 1px solid #22303d;
+    border-radius: 9px;
+    padding: 18px;
+    margin-bottom: 18px;
+}
+
+.control-row {
+    display: grid;
+    grid-template-columns: auto 1fr auto auto;
+    gap: 12px;
+    align-items: center;
+}
+
+.button {
+    display: inline-block;
+    border: 1px solid #2c4052;
+    background: #172430;
+    color: #dce7f3;
+    padding: 10px 15px;
+    border-radius: 7px;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.button:hover {
+    border-color: #39d98a;
+    color: #39d98a;
+}
+
+.button.disabled {
+    opacity: 0.35;
+    pointer-events: none;
+}
+
+select {
+    width: 100%;
+    background: #0c151e;
+    color: #dce7f3;
+    border: 1px solid #2b3c4b;
+    border-radius: 7px;
+    padding: 10px 12px;
+}
+
+.observation {
+    background: #111b26;
+    border: 1px solid #22303d;
+    border-radius: 9px;
+    padding: 20px;
+    margin-bottom: 18px;
+}
+
+.observation-label {
+    color: #718396;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    font-size: 11px;
+}
+
+.observation-time {
+    font-size: 20px;
+    font-weight: 650;
+    margin-top: 6px;
+}
+
+.utc {
+    color: #718396;
+    margin-top: 6px;
+    font-size: 12px;
+}
+
+.grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+}
+
+.panel {
+    background: #111b26;
+    border: 1px solid #22303d;
+    border-radius: 9px;
+    overflow: hidden;
+}
+
+.panel-title {
+    padding: 15px 18px;
+    border-bottom: 1px solid #22303d;
+    font-weight: 650;
+}
+
+.row {
+    display: grid;
+    grid-template-columns: 150px 1fr;
+    gap: 14px;
+    padding: 11px 18px;
+    border-bottom: 1px solid #192631;
+}
+
+.row:last-child {
+    border-bottom: 0;
+}
+
+.key {
+    color: #718396;
+    font-size: 13px;
+}
+
+.value {
+    color: #dce7f3;
+    word-break: break-word;
+}
+
+.good {
+    color: #39d98a;
+}
+
+.dns {
+    margin: 0;
+    padding-left: 18px;
+}
+
+.dns li {
+    margin: 4px 0;
+}
+
+.empty {
+    background: #111b26;
+    border: 1px solid #22303d;
+    border-radius: 9px;
+    padding: 45px;
+    text-align: center;
+    color: #718396;
+}
+
+.forensic-note {
+    margin-top: 18px;
+    color: #687b8c;
+    font-size: 12px;
+}
+
+@media (max-width: 900px) {
+    .layout {
+        grid-template-columns: 1fr;
+    }
+
+    .sidebar {
+        display: none;
+    }
+
+    .grid {
+        grid-template-columns: 1fr;
+    }
+
+    .control-row {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
+</head>
+
+<body>
+
+<div class="layout">
+
+<aside class="sidebar">
+    <div class="brand">WiFi-Trace</div>
+    <div class="subtitle">Network Forensics</div>
+
+    <a class="nav-item" href="/">Overview</a>
+    <a class="nav-item" href="/networks">Networks</a>
+    <a class="nav-item" href="#">Devices</a>
+    <a class="nav-item" href="/timeline">Timeline</a>
+    <a class="nav-item active" href="/time-machine">Time Machine</a>
+    <a class="nav-item" href="#">Security</a>
+    <a class="nav-item" href="#">Investigations</a>
+    <a class="nav-item" href="#">Evidence</a>
+    <a class="nav-item" href="#">Reports</a>
+</aside>
+
+<main class="main">
+
+<div class="header">
+    <div>
+        <h1>Network Time Machine</h1>
+        <p class="description">
+            Reconstruct the network state observed at a specific point in time.
+        </p>
+    </div>
+
+    <div class="badge">FORENSIC HISTORY</div>
+</div>
+
+{% if snapshot %}
+
+<div class="control-panel">
+    <div class="control-row">
+
+        {% if navigation.previous %}
+        <a
+            class="button"
+            href="/time-machine?snapshot={{ navigation.previous }}"
+        >
+            ← Previous
+        </a>
+        {% else %}
+        <span class="button disabled">← Previous</span>
+        {% endif %}
+
+        <select
+            id="snapshotSelector"
+            onchange="selectSnapshot(this.value)"
+        >
+            {% for item in snapshots %}
+            <option
+                value="{{ item.id }}"
+                {% if item.id == snapshot.id %}selected{% endif %}
+            >
+                #{{ item.id }} — {{ item.observed_at }}
+            </option>
+            {% endfor %}
+        </select>
+
+        {% if navigation.next %}
+        <a
+            class="button"
+            href="/time-machine?snapshot={{ navigation.next }}"
+        >
+            Next →
+        </a>
+        {% else %}
+        <span class="button disabled">Next →</span>
+        {% endif %}
+
+        <a class="button" href="/time-machine">
+            Latest
+        </a>
+
+    </div>
+</div>
+
+<div class="observation">
+    <div class="observation-label">Historical Observation</div>
+
+    <div
+        id="observationLocal"
+        class="observation-time"
+        data-utc="{{ snapshot.observed_at }}"
+    >
+        {{ snapshot.observed_at }}
+    </div>
+
+    <div class="utc">
+        Evidence timestamp:
+        {{ snapshot.observed_at }}
+    </div>
+</div>
+
+<div class="grid">
+
+    <section class="panel">
+        <div class="panel-title">Network</div>
+
+        <div class="row">
+            <div class="key">Gateway</div>
+            <div class="value">
+                {{ snapshot.gateway or "Unavailable" }}
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="key">Local IPv4</div>
+            <div class="value">
+                {{ snapshot.ip_address or "Unavailable" }}
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="key">Interface</div>
+            <div class="value">
+                {{ snapshot.interface or "Unavailable" }}
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="key">SSID</div>
+            <div class="value">
+                {{ snapshot.ssid or "Unavailable" }}
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="key">Country</div>
+            <div class="value">
+                {{ snapshot.country or "Unavailable" }}
+            </div>
+        </div>
+    </section>
+
+
+    <section class="panel">
+        <div class="panel-title">Wireless</div>
+
+        <div class="row">
+            <div class="key">Status</div>
+            <div class="value good">
+                {{ snapshot.wifi_status or "Unavailable" }}
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="key">Standard</div>
+            <div class="value">
+                {{ snapshot.phy_mode or "Unavailable" }}
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="key">Channel</div>
+            <div class="value">
+                {{ snapshot.channel or "Unavailable" }}
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="key">Security</div>
+            <div class="value">
+                {{ snapshot.security or "Unavailable" }}
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="key">Transmit Rate</div>
+            <div class="value">
+                {% if snapshot.tx_rate %}
+                    {{ snapshot.tx_rate }} Mbps
+                {% else %}
+                    Unavailable
+                {% endif %}
+            </div>
+        </div>
+    </section>
+
+
+    <section class="panel">
+        <div class="panel-title">Radio Evidence</div>
+
+        <div class="row">
+            <div class="key">Signal</div>
+            <div class="value">
+                {% if snapshot.signal is not none %}
+                    {{ snapshot.signal }} dBm
+                {% else %}
+                    Unavailable
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="key">Noise</div>
+            <div class="value">
+                {% if snapshot.noise is not none %}
+                    {{ snapshot.noise }} dBm
+                {% else %}
+                    Unavailable
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="key">SNR</div>
+            <div class="value">
+                {% if snapshot.snr is not none %}
+                    {{ snapshot.snr }} dB
+                {% else %}
+                    Unavailable
+                {% endif %}
+            </div>
+        </div>
+    </section>
+
+
+    <section class="panel">
+        <div class="panel-title">DNS Configuration</div>
+
+        <div class="row">
+            <div class="key">DNS Servers</div>
+
+            <div class="value">
+                {% if snapshot.dns_servers %}
+                <ul class="dns">
+                    {% for server in snapshot.dns_servers %}
+                    <li>{{ server }}</li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                    Unavailable
+                {% endif %}
+            </div>
+        </div>
+    </section>
+
+
+    <section class="panel">
+        <div class="panel-title">Evidence</div>
+
+        <div class="row">
+            <div class="key">Snapshot ID</div>
+            <div class="value">
+                #{{ snapshot.id }}
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="key">Recorded UTC</div>
+            <div class="value">
+                {{ snapshot.observed_at }}
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="key">Source</div>
+            <div class="value">
+                WiFi-Trace Local Collector
+            </div>
+        </div>
+    </section>
+
+</div>
+
+<div class="forensic-note">
+    WiFi-Trace reconstructs previously observed state.
+    Historical values represent evidence collected at the displayed timestamp,
+    not assumptions about network state between observations.
+</div>
+
+{% else %}
+
+<div class="empty">
+    No historical snapshots are available yet.
+</div>
+
+{% endif %}
+
+</main>
+</div>
+
+<script>
+function selectSnapshot(id) {
+    if (!id) {
+        return;
+    }
+
+    window.location.href =
+        "/time-machine?snapshot=" + encodeURIComponent(id);
+}
+
+const localElement =
+    document.getElementById("observationLocal");
+
+if (localElement) {
+    const raw = localElement.dataset.utc;
+    const date = new Date(raw);
+
+    if (!Number.isNaN(date.getTime())) {
+        localElement.textContent =
+            date.toLocaleString();
+    }
+}
+</script>
+
+</body>
+</html>
