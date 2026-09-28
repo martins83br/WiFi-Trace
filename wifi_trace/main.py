@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 import platform
@@ -5,10 +6,22 @@ import socket
 import psutil
 from wifi_trace.collectors.macos import collect_network_info
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    init_database()
+    monitor.start()
+
+    try:
+        yield
+    finally:
+        monitor.stop()
+
+
 app = FastAPI(
     title="WiFi-Trace",
     description="Wireless Network Forensics & Timeline Analysis",
     version="0.1.0",
+    lifespan=lifespan,
 )
 
 
@@ -424,3 +437,122 @@ def network_password(ssid: str = Form(...)):
             "Pragma": "no-cache",
         },
     )
+
+
+from wifi_trace.database import init_database, save_snapshot, get_recent_events, get_database_stats
+
+
+@app.get("/timeline")
+def timeline_page(request: Request):
+    events = get_recent_events(limit=100)
+    stats = get_database_stats()
+
+    return templates.TemplateResponse(
+        request=request,
+        name="timeline.html",
+        context={
+            "events": events,
+            "stats": stats,
+        },
+    )
+
+
+@app.post("/api/timeline/observe")
+def record_timeline_observation():
+    network = collect_network_info()
+    result = save_snapshot(network)
+
+    response = JSONResponse(
+        content={
+            "success": True,
+            **result,
+        }
+    )
+
+    response.headers["Cache-Control"] = (
+        "no-store, no-cache, must-revalidate"
+    )
+    response.headers["Pragma"] = "no-cache"
+
+    return response
+
+
+@app.get("/api/timeline")
+def timeline_api():
+    response = JSONResponse(
+        content={
+            "events": get_recent_events(limit=100),
+            "stats": get_database_stats(),
+        }
+    )
+
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+from wifi_trace.monitor import monitor
+
+
+@app.get("/api/monitor/status")
+def monitor_status():
+    response = JSONResponse(
+        content={
+            **monitor.status(),
+            "database": get_database_stats(),
+        }
+    )
+
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+from wifi_trace.database import get_snapshot, get_snapshot_navigation, get_latest_snapshot_id, get_snapshot_index
+
+
+@app.get("/time-machine")
+def time_machine_page(request: Request, snapshot: int | None = None):
+    if snapshot is None:
+        snapshot = get_latest_snapshot_id()
+
+    selected = get_snapshot(snapshot) if snapshot is not None else None
+
+    navigation = (
+        get_snapshot_navigation(snapshot)
+        if snapshot is not None
+        else {"previous": None, "next": None}
+    )
+
+    snapshots = get_snapshot_index(limit=250)
+
+    return templates.TemplateResponse(
+        request=request,
+        name="time_machine.html",
+        context={
+            "snapshot": selected,
+            "navigation": navigation,
+            "snapshots": snapshots,
+        },
+    )
+
+
+@app.get("/api/time-machine/{snapshot_id}")
+def time_machine_api(snapshot_id: int):
+    snapshot = get_snapshot(snapshot_id)
+
+    if snapshot is None:
+        return JSONResponse(
+            status_code=404,
+            content={
+                "success": False,
+                "detail": "Snapshot not found",
+            },
+        )
+
+    response = JSONResponse(
+        content={
+            "success": True,
+            "snapshot": snapshot,
+            "navigation": get_snapshot_navigation(snapshot_id),
+        }
+    )
+
+    response.headers["Cache-Control"] = "no-store"
+    return response

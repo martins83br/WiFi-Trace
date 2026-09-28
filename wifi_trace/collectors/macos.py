@@ -142,6 +142,20 @@ def collect_network_info() -> dict:
 
     interface = route["interface"]
 
+    # Validate Wi-Fi radio telemetry.
+    #
+    # RSSI/noise readings such as 0 dBm can appear temporarily when macOS
+    # cannot provide a valid radio measurement. They must be treated as
+    # unavailable rather than as real forensic changes.
+    signal = wifi.get("signal")
+    noise = wifi.get("noise")
+
+    if not isinstance(signal, int) or not (-100 <= signal <= -1):
+        signal = None
+
+    if not isinstance(noise, int) or not (-120 <= noise <= -1):
+        noise = None
+
     return {
         "interface": interface,
         "ip_address": get_ipv4(interface),

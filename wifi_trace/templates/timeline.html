@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Timeline | WiFi-Trace</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            background: #0b1118;
+            color: #dce7f3;
+            font-family:
+                -apple-system,
+                BlinkMacSystemFont,
+                "Segoe UI",
+                sans-serif;
+        }
+
+        a {
+            color: inherit;
+            text-decoration: none;
+        }
+
+        .layout {
+            min-height: 100vh;
+            display: grid;
+            grid-template-columns: 230px 1fr;
+        }
+
+        .sidebar {
+            background: #101820;
+            border-right: 1px solid #22303d;
+            padding: 24px 16px;
+        }
+
+        .brand {
+            color: #39d98a;
+            font-size: 22px;
+            font-weight: 700;
+            margin: 0 10px 6px;
+        }
+
+        .subtitle {
+            color: #6f8192;
+            font-size: 11px;
+            margin: 0 10px 28px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .nav-item {
+            display: block;
+            padding: 11px 12px;
+            border-radius: 7px;
+            margin-bottom: 5px;
+            color: #9fb0c0;
+        }
+
+        .nav-item:hover,
+        .nav-item.active {
+            background: #172430;
+            color: #39d98a;
+        }
+
+        .main {
+            padding: 34px;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            gap: 20px;
+            align-items: flex-start;
+            margin-bottom: 28px;
+        }
+
+        h1 {
+            margin: 0 0 7px;
+            font-size: 27px;
+        }
+
+        .description {
+            color: #7f91a3;
+            margin: 0;
+        }
+
+        .record-button {
+            border: 0;
+            background: #39d98a;
+            color: #07110c;
+            font-weight: 700;
+            padding: 11px 18px;
+            border-radius: 7px;
+            cursor: pointer;
+        }
+
+        .record-button:disabled {
+            opacity: 0.55;
+            cursor: wait;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 14px;
+            margin-bottom: 26px;
+        }
+
+        .card {
+            background: #111b26;
+            border: 1px solid #22303d;
+            border-radius: 9px;
+            padding: 18px;
+        }
+
+        .label {
+            color: #708295;
+            text-transform: uppercase;
+            font-size: 11px;
+            letter-spacing: 0.8px;
+            margin-bottom: 7px;
+        }
+
+        .value {
+            font-size: 21px;
+            font-weight: 650;
+        }
+
+        .panel {
+            background: #111b26;
+            border: 1px solid #22303d;
+            border-radius: 9px;
+            overflow: hidden;
+        }
+
+        .panel-title {
+            padding: 17px 20px;
+            border-bottom: 1px solid #22303d;
+            font-weight: 650;
+        }
+
+        .timeline {
+            padding: 8px 20px 20px;
+        }
+
+        .event {
+            position: relative;
+            display: grid;
+            grid-template-columns: 185px 18px 1fr;
+            gap: 16px;
+            min-height: 88px;
+        }
+
+        .time {
+            color: #718396;
+            padding-top: 22px;
+            font-size: 13px;
+        }
+
+        .track {
+            position: relative;
+        }
+
+        .track::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: 8px;
+            width: 1px;
+            background: #293847;
+        }
+
+        .dot {
+            position: absolute;
+            left: 3px;
+            top: 26px;
+            width: 11px;
+            height: 11px;
+            border-radius: 50%;
+            background: #39d98a;
+            box-shadow: 0 0 0 4px #14241f;
+        }
+
+        .dot.warning {
+            background: #f0b35a;
+            box-shadow: 0 0 0 4px #2a2419;
+        }
+
+        .dot.notice {
+            background: #69a7ff;
+            box-shadow: 0 0 0 4px #18253a;
+        }
+
+        .event-content {
+            padding: 18px 0;
+            border-bottom: 1px solid #1d2a36;
+        }
+
+        .event-title {
+            font-weight: 650;
+            margin-bottom: 7px;
+        }
+
+        .event-change {
+            color: #8fa1b2;
+            font-size: 14px;
+            word-break: break-word;
+        }
+
+        .old {
+            color: #cf7880;
+        }
+
+        .new {
+            color: #65d99a;
+        }
+
+        .arrow {
+            color: #617283;
+            margin: 0 8px;
+        }
+
+        .empty {
+            padding: 35px 20px;
+            color: #718396;
+            text-align: center;
+        }
+
+        .status {
+            margin-top: 12px;
+            min-height: 20px;
+            color: #718396;
+            font-size: 13px;
+            text-align: right;
+        }
+
+        @media (max-width: 900px) {
+            .layout {
+                grid-template-columns: 1fr;
+            }
+
+            .sidebar {
+                display: none;
+            }
+
+            .stats {
+                grid-template-columns: 1fr;
+            }
+
+            .event {
+                grid-template-columns: 120px 18px 1fr;
+            }
+        }
+    </style>
+</head>
+
+<body>
+<div class="layout">
+
+    <aside class="sidebar">
+        <div class="brand">WiFi-Trace</div>
+        <div class="subtitle">Network Forensics</div>
+
+        <a class="nav-item" href="/">Overview</a>
+        <a class="nav-item" href="/networks">Networks</a>
+        <a class="nav-item" href="#">Devices</a>
+        <a class="nav-item active" href="/timeline">Timeline</a>
+        <a class="nav-item" href="/time-machine">Time Machine</a>
+        <a class="nav-item" href="#">Security</a>
+        <a class="nav-item" href="#">Investigations</a>
+        <a class="nav-item" href="#">Evidence</a>
+        <a class="nav-item" href="#">Reports</a>
+    </aside>
+
+    <main class="main">
+
+        <div class="header">
+            <div>
+                <h1>Network Timeline</h1>
+                <p class="description">
+                    Historical observations and detected network changes.
+                </p>
+            </div>
+
+            <button
+                id="recordButton"
+                class="record-button"
+                onclick="recordObservation()"
+            >
+                Record Observation
+            </button>
+        </div>
+
+        <section class="stats">
+            <div class="card">
+                <div class="label">Snapshots</div>
+                <div class="value">{{ stats.snapshots }}</div>
+            </div>
+
+            <div class="card">
+                <div class="label">Detected Events</div>
+                <div class="value">{{ stats.events }}</div>
+            </div>
+
+            <div class="card">
+                <div class="label">Forensic Engine</div>
+                <div
+                    id="engineStatus"
+                    class="value"
+                    style="color:#39d98a;"
+                >
+                    ● MONITORING
+                </div>
+                <div
+                    id="engineDetails"
+                    style="
+                        margin-top:6px;
+                        color:#718396;
+                        font-size:12px;
+                    "
+                >
+                    Checking monitor...
+                </div>
+            </div>
+        </section>
+
+        <section class="panel">
+            <div class="panel-title">
+                Forensic Event Timeline
+            </div>
+
+            {% if events %}
+
+            <div class="timeline">
+
+                {% for event in events %}
+
+                <div class="event">
+
+                    <div
+                        class="time local-time"
+                        data-utc="{{ event.observed_at }}"
+                    >
+                        {{ event.observed_at }}
+                    </div>
+
+                    <div class="track">
+                        <div class="dot {{ event.severity }}"></div>
+                    </div>
+
+                    <div class="event-content">
+
+                        <div class="event-title">
+                            {{ event.field_label }}
+                        </div>
+
+                        {% if event.event_type == "baseline" %}
+
+                        <div class="event-change">
+                            {{ event.new_value }}
+                        </div>
+
+                        {% else %}
+
+                        <div class="event-change">
+                            <span class="old">
+                                {{ event.old_value or "Unavailable" }}
+                            </span>
+
+                            <span class="arrow">→</span>
+
+                            <span class="new">
+                                {{ event.new_value or "Unavailable" }}
+                            </span>
+                        </div>
+
+                        {% endif %}
+
+                    </div>
+                </div>
+
+                {% endfor %}
+
+            </div>
+
+            {% else %}
+
+            <div class="empty">
+                No observations recorded yet.
+            </div>
+
+            {% endif %}
+        </section>
+
+        <div id="status" class="status"></div>
+
+    </main>
+</div>
+
+<script>
+function formatLocalTimes() {
+    document.querySelectorAll(".local-time").forEach((element) => {
+        const raw = element.dataset.utc;
+
+        if (!raw) {
+            return;
+        }
+
+        const date = new Date(raw);
+
+        if (Number.isNaN(date.getTime())) {
+            return;
+        }
+
+        element.textContent = date.toLocaleString();
+        element.title = raw + " (stored in UTC)";
+    });
+}
+
+async function refreshMonitorStatus() {
+    const engine = document.getElementById("engineStatus");
+    const details = document.getElementById("engineDetails");
+
+    try {
+        const response = await fetch(
+            "/api/monitor/status",
+            {
+                cache: "no-store"
+            }
+        );
+
+        const data = await response.json();
+
+        if (data.running) {
+            engine.textContent = "● MONITORING";
+            engine.style.color = "#39d98a";
+        } else {
+            engine.textContent = "● STOPPED";
+            engine.style.color = "#cf7880";
+        }
+
+        let last = "Waiting for first observation";
+
+        if (data.last_observation) {
+            const date = new Date(data.last_observation);
+
+            if (!Number.isNaN(date.getTime())) {
+                last = "Last: " + date.toLocaleTimeString();
+            }
+        }
+
+        details.textContent =
+            last + " · Every " + data.interval + "s";
+
+    } catch (error) {
+        engine.textContent = "● UNKNOWN";
+        engine.style.color = "#f0b35a";
+        details.textContent = "Monitor status unavailable";
+    }
+}
+
+async function recordObservation() {
+    const button = document.getElementById("recordButton");
+    const status = document.getElementById("status");
+
+    button.disabled = true;
+    status.textContent = "Collecting network evidence...";
+
+    try {
+        const response = await fetch(
+            "/api/timeline/observe",
+            {
+                method: "POST",
+                cache: "no-store"
+            }
+        );
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.detail || "Observation failed");
+        }
+
+        status.textContent =
+            `Observation recorded. ${data.events_created} event(s) detected.`;
+
+        setTimeout(() => {
+            window.location.reload();
+        }, 600);
+
+    } catch (error) {
+        status.textContent = "Unable to record observation.";
+        button.disabled = false;
+    }
+}
+formatLocalTimes();
+refreshMonitorStatus();
+
+setInterval(refreshMonitorStatus, 5000);
+</script>
+
+</body>
+</html>
