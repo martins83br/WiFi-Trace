@@ -602,3 +602,41 @@ def devices_api():
 
     response.headers["Cache-Control"] = "no-store"
     return response
+
+
+from wifi_trace.lan_discovery import lan_discovery
+
+
+@app.post("/api/devices/discover")
+def discover_devices():
+    try:
+        result = lan_discovery.scan_once()
+
+        response = JSONResponse(
+            content={
+                "success": True,
+                **result,
+            }
+        )
+
+        response.headers["Cache-Control"] = "no-store"
+        return response
+
+    except Exception as exc:
+        return JSONResponse(
+            status_code=500,
+            content={
+                "success": False,
+                "detail": f"{type(exc).__name__}: {exc}",
+            },
+        )
+
+
+@app.get("/api/devices/discovery/status")
+def discovery_status():
+    response = JSONResponse(
+        content=lan_discovery.status()
+    )
+
+    response.headers["Cache-Control"] = "no-store"
+    return response
