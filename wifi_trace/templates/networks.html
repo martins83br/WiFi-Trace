@@ -198,11 +198,18 @@ async function togglePassword(index, ssid) {
     button.disabled = true;
 
     try {
+        const body = new URLSearchParams();
+        body.append("ssid", ssid);
+
         const response = await fetch(
-            `/api/networks/password?ssid=${encodeURIComponent(ssid)}`,
+            "/api/networks/password",
             {
-                method: "GET",
-                cache: "no-store"
+                method: "POST",
+                cache: "no-store",
+                headers: {
+                    "Content-Type": "application/x-www-form-urlencoded"
+                },
+                body: body
             }
         );
 

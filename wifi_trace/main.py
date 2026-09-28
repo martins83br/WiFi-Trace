@@ -379,7 +379,7 @@ Wireless Network Forensics & Timeline Analysis
 """
 
 
-from fastapi import Request
+from fastapi import Request, Form
 from fastapi.responses import JSONResponse
 from fastapi.templating import Jinja2Templates
 from wifi_trace.collectors.macos import (
@@ -401,8 +401,8 @@ def networks_page(request: Request):
     )
 
 
-@app.get("/api/networks/password")
-def network_password(ssid: str):
+@app.post("/api/networks/password")
+def network_password(ssid: str = Form(...)):
     password = get_saved_wifi_password(ssid)
 
     if password is None:
