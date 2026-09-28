@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Device Passport | WiFi-Trace</title>
+
+<style>
+* { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    background: #0b1118;
+    color: #dce7f3;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+a {
+    color: inherit;
+    text-decoration: none;
+}
+
+.layout {
+    min-height: 100vh;
+    display: grid;
+    grid-template-columns: 230px 1fr;
+}
+
+.sidebar {
+    background: #101820;
+    border-right: 1px solid #22303d;
+    padding: 24px 16px;
+}
+
+.brand {
+    color: #39d98a;
+    font-size: 22px;
+    font-weight: 700;
+    margin: 0 10px 6px;
+}
+
+.subtitle {
+    color: #6f8192;
+    font-size: 11px;
+    margin: 0 10px 28px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.nav-item {
+    display: block;
+    padding: 11px 12px;
+    border-radius: 7px;
+    margin-bottom: 5px;
+    color: #9fb0c0;
+}
+
+.nav-item:hover,
+.nav-item.active {
+    background: #172430;
+    color: #39d98a;
+}
+
+.main {
+    padding: 34px;
+    max-width: 1450px;
+}
+
+.back {
+    display: inline-block;
+    color: #7f91a3;
+    margin-bottom: 18px;
+}
+
+.back:hover {
+    color: #39d98a;
+}
+
+h1 {
+    margin: 0;
+    font-size: 28px;
+}
+
+.passport-label {
+    color: #39d98a;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-size: 11px;
+    margin-bottom: 6px;
+}
+
+.description {
+    color: #7f91a3;
+    margin: 8px 0 25px;
+}
+
+.stats {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+    margin-bottom: 18px;
+}
+
+.stat,
+.panel {
+    background: #111b26;
+    border: 1px solid #22303d;
+    border-radius: 9px;
+}
+
+.stat {
+    padding: 17px;
+}
+
+.stat-label {
+    color: #718396;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .7px;
+}
+
+.stat-value {
+    margin-top: 7px;
+    font-size: 17px;
+    font-weight: 600;
+}
+
+.grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+}
+
+.panel {
+    overflow: hidden;
+}
+
+.panel-title {
+    padding: 15px 18px;
+    border-bottom: 1px solid #22303d;
+    font-weight: 650;
+}
+
+.row {
+    display: grid;
+    grid-template-columns: 140px 1fr;
+    gap: 15px;
+    padding: 11px 18px;
+    border-bottom: 1px solid #192631;
+}
+
+.row:last-child {
+    border-bottom: 0;
+}
+
+.key {
+    color: #718396;
+    font-size: 13px;
+}
+
+.history {
+    margin-top: 16px;
+}
+
+.observation {
+    padding: 14px 18px;
+    border-bottom: 1px solid #192631;
+}
+
+.observation:last-child {
+    border-bottom: 0;
+}
+
+.observation-time {
+    color: #39d98a;
+    font-size: 12px;
+    margin-bottom: 6px;
+}
+
+.observation-detail {
+    color: #9fb0c0;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.note {
+    color: #718396;
+    font-size: 12px;
+    margin-top: 5px;
+}
+
+@media (max-width: 900px) {
+    .layout { grid-template-columns: 1fr; }
+    .sidebar { display: none; }
+    .grid, .stats { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+
+<body>
+
+<div class="layout">
+
+<aside class="sidebar">
+    <div class="brand">WiFi-Trace</div>
+    <div class="subtitle">Network Forensics</div>
+
+    <a class="nav-item" href="/">Overview</a>
+    <a class="nav-item" href="/networks">Networks</a>
+    <a class="nav-item active" href="/devices">Devices</a>
+    <a class="nav-item" href="/timeline">Timeline</a>
+    <a class="nav-item" href="/time-machine">Time Machine</a>
+    <a class="nav-item" href="#">Security</a>
+    <a class="nav-item" href="#">Investigations</a>
+    <a class="nav-item" href="#">Evidence</a>
+    <a class="nav-item" href="#">Reports</a>
+</aside>
+
+<main class="main">
+
+<a class="back" href="/devices">← Observed Devices</a>
+
+<div class="passport-label">Device Passport</div>
+
+<h1>{{ device.display_name or "Observed Device" }}</h1>
+
+<p class="description">
+Historical identity and observation record based only on collected evidence.
+</p>
+
+<div class="stats">
+
+<div class="stat">
+    <div class="stat-label">First Seen</div>
+    <div
+        class="stat-value local-time"
+        data-utc="{{ device.first_seen }}"
+    >
+        {{ device.first_seen }}
+    </div>
+</div>
+
+<div class="stat">
+    <div class="stat-label">Last Seen</div>
+    <div
+        class="stat-value local-time"
+        data-utc="{{ device.last_seen }}"
+    >
+        {{ device.last_seen }}
+    </div>
+</div>
+
+<div class="stat">
+    <div class="stat-label">Observations</div>
+    <div class="stat-value">
+        {{ device.observation_count }}
+    </div>
+</div>
+
+</div>
+
+<div class="grid">
+
+<section class="panel">
+
+<div class="panel-title">Identity</div>
+
+<div class="row">
+    <div class="key">Device Type</div>
+    <div>{{ device.device_type }}</div>
+</div>
+
+<div class="row">
+    <div class="key">Evidence Key</div>
+    <div>{{ device.device_key }}</div>
+</div>
+
+<div class="row">
+    <div class="key">Device ID</div>
+    <div>#{{ device.id }}</div>
+</div>
+
+</section>
+
+
+<section class="panel">
+
+<div class="panel-title">IP History</div>
+
+{% if device.ip_history %}
+
+{% for item in device.ip_history %}
+<div class="row">
+    <div class="key">{{ item.ip_address }}</div>
+    <div>
+        {{ item.observations }} observation{% if item.observations != 1 %}s{% endif %}
+    </div>
+</div>
+{% endfor %}
+
+{% else %}
+
+<div class="row">
+    <div class="key">History</div>
+    <div>Unavailable</div>
+</div>
+
+{% endif %}
+
+</section>
+
+</div>
+
+
+<section class="panel history">
+
+<div class="panel-title">Observation History</div>
+
+{% for observation in device.observations %}
+
+<div class="observation">
+
+    <div
+        class="observation-time local-time"
+        data-utc="{{ observation.observed_at }}"
+    >
+        {{ observation.observed_at }}
+    </div>
+
+    <div class="observation-detail">
+
+        IP:
+        {{ observation.ip_address or "Unavailable" }}
+
+        &nbsp; · &nbsp;
+
+        MAC:
+        {{ observation.mac_address or "Unavailable" }}
+
+        &nbsp; · &nbsp;
+
+        Source:
+        {{ observation.source }}
+
+    </div>
+
+    {% if observation.evidence_note %}
+    <div class="note">
+        {{ observation.evidence_note }}
+    </div>
+    {% endif %}
+
+</div>
+
+{% endfor %}
+
+</section>
+
+</main>
+</div>
+
+<script>
+document.querySelectorAll(".local-time").forEach((element) => {
+    const date = new Date(element.dataset.utc);
+
+    if (!Number.isNaN(date.getTime())) {
+        element.textContent = date.toLocaleString();
+    }
+});
+</script>
+
+</body>
+</html>

@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Observed Devices | WiFi-Trace</title>
+
+<style>
+* { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    background: #0b1118;
+    color: #dce7f3;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+a {
+    color: inherit;
+    text-decoration: none;
+}
+
+.layout {
+    min-height: 100vh;
+    display: grid;
+    grid-template-columns: 230px 1fr;
+}
+
+.sidebar {
+    background: #101820;
+    border-right: 1px solid #22303d;
+    padding: 24px 16px;
+}
+
+.brand {
+    color: #39d98a;
+    font-size: 22px;
+    font-weight: 700;
+    margin: 0 10px 6px;
+}
+
+.subtitle {
+    color: #6f8192;
+    font-size: 11px;
+    margin: 0 10px 28px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.nav-item {
+    display: block;
+    padding: 11px 12px;
+    border-radius: 7px;
+    margin-bottom: 5px;
+    color: #9fb0c0;
+}
+
+.nav-item:hover,
+.nav-item.active {
+    background: #172430;
+    color: #39d98a;
+}
+
+.main {
+    padding: 34px;
+    max-width: 1450px;
+}
+
+h1 {
+    margin: 0 0 7px;
+    font-size: 28px;
+}
+
+.description {
+    color: #7f91a3;
+    margin: 0 0 25px;
+}
+
+.notice {
+    background: #111b26;
+    border: 1px solid #22303d;
+    border-left: 3px solid #39d98a;
+    border-radius: 8px;
+    padding: 14px 16px;
+    color: #8fa2b4;
+    margin-bottom: 20px;
+    line-height: 1.5;
+}
+
+.stats {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+    margin-bottom: 18px;
+}
+
+.stat {
+    background: #111b26;
+    border: 1px solid #22303d;
+    border-radius: 9px;
+    padding: 17px;
+}
+
+.stat-label {
+    color: #718396;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .7px;
+}
+
+.stat-value {
+    margin-top: 7px;
+    font-size: 22px;
+    font-weight: 650;
+}
+
+.table-wrap {
+    background: #111b26;
+    border: 1px solid #22303d;
+    border-radius: 9px;
+    overflow: hidden;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+th {
+    text-align: left;
+    padding: 13px 16px;
+    color: #718396;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .7px;
+    border-bottom: 1px solid #22303d;
+}
+
+td {
+    padding: 15px 16px;
+    border-bottom: 1px solid #192631;
+}
+
+tr:last-child td {
+    border-bottom: 0;
+}
+
+.device-link {
+    color: #39d98a;
+    font-weight: 600;
+}
+
+.type {
+    display: inline-block;
+    padding: 5px 9px;
+    border-radius: 14px;
+    background: #172430;
+    color: #9fb0c0;
+    font-size: 12px;
+}
+
+.muted {
+    color: #718396;
+}
+
+.empty {
+    padding: 40px;
+    text-align: center;
+    color: #718396;
+}
+
+@media (max-width: 900px) {
+    .layout { grid-template-columns: 1fr; }
+    .sidebar { display: none; }
+    .stats { grid-template-columns: 1fr; }
+    .table-wrap { overflow-x: auto; }
+}
+</style>
+</head>
+
+<body>
+
+<div class="layout">
+
+<aside class="sidebar">
+    <div class="brand">WiFi-Trace</div>
+    <div class="subtitle">Network Forensics</div>
+
+    <a class="nav-item" href="/">Overview</a>
+    <a class="nav-item" href="/networks">Networks</a>
+    <a class="nav-item active" href="/devices">Devices</a>
+    <a class="nav-item" href="/timeline">Timeline</a>
+    <a class="nav-item" href="/time-machine">Time Machine</a>
+    <a class="nav-item" href="#">Security</a>
+    <a class="nav-item" href="#">Investigations</a>
+    <a class="nav-item" href="#">Evidence</a>
+    <a class="nav-item" href="#">Reports</a>
+</aside>
+
+<main class="main">
+
+<h1>Observed Devices</h1>
+
+<p class="description">
+Devices supported by evidence collected by WiFi-Trace.
+</p>
+
+<div class="notice">
+This is an evidence view, not a claim that every device connected to the
+network has been discovered. WiFi-Trace only lists devices supported by
+available local or integrated data sources.
+</div>
+
+<div class="stats">
+    <div class="stat">
+        <div class="stat-label">Observed Devices</div>
+        <div class="stat-value">{{ devices|length }}</div>
+    </div>
+
+    <div class="stat">
+        <div class="stat-label">Collection Mode</div>
+        <div class="stat-value">Passive</div>
+    </div>
+
+    <div class="stat">
+        <div class="stat-label">Evidence Model</div>
+        <div class="stat-value">Historical</div>
+    </div>
+</div>
+
+<div class="table-wrap">
+
+{% if devices %}
+
+<table>
+<thead>
+<tr>
+    <th>Device</th>
+    <th>Type</th>
+    <th>Latest IP</th>
+    <th>Source</th>
+    <th>Observations</th>
+    <th>Last Seen</th>
+</tr>
+</thead>
+
+<tbody>
+
+{% for device in devices %}
+<tr>
+    <td>
+        <a
+            class="device-link"
+            href="/devices/{{ device.id }}"
+        >
+            {{ device.display_name or "Observed Device" }}
+        </a>
+    </td>
+
+    <td>
+        <span class="type">
+            {{ device.device_type }}
+        </span>
+    </td>
+
+    <td>
+        {{ device.latest_ip or "Unavailable" }}
+    </td>
+
+    <td>
+        {{ device.latest_source or "Unavailable" }}
+    </td>
+
+    <td>
+        {{ device.observation_count }}
+    </td>
+
+    <td
+        class="local-time"
+        data-utc="{{ device.last_seen }}"
+    >
+        {{ device.last_seen }}
+    </td>
+</tr>
+{% endfor %}
+
+</tbody>
+</table>
+
+{% else %}
+
+<div class="empty">
+No defensible device observations have been recorded yet.
+</div>
+
+{% endif %}
+
+</div>
+
+</main>
+</div>
+
+<script>
+document.querySelectorAll(".local-time").forEach((element) => {
+    const date = new Date(element.dataset.utc);
+
+    if (!Number.isNaN(date.getTime())) {
+        element.textContent = date.toLocaleString();
+    }
+});
+</script>
+
+</body>
+</html>

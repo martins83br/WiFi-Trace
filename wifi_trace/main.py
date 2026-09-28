@@ -556,3 +556,49 @@ def time_machine_api(snapshot_id: int):
 
     response.headers["Cache-Control"] = "no-store"
     return response
+
+from wifi_trace.database import get_observed_devices, get_device_passport, record_core_devices
+
+
+@app.get("/devices")
+def devices_page(request: Request):
+    devices = get_observed_devices()
+
+    return templates.TemplateResponse(
+        request=request,
+        name="devices.html",
+        context={
+            "devices": devices,
+        },
+    )
+
+
+@app.get("/devices/{device_id}")
+def device_passport_page(request: Request, device_id: int):
+    device = get_device_passport(device_id)
+
+    if device is None:
+        return JSONResponse(
+            status_code=404,
+            content={"detail": "Observed device not found"},
+        )
+
+    return templates.TemplateResponse(
+        request=request,
+        name="device_passport.html",
+        context={
+            "device": device,
+        },
+    )
+
+
+@app.get("/api/devices")
+def devices_api():
+    response = JSONResponse(
+        content={
+            "devices": get_observed_devices(),
+        }
+    )
+
+    response.headers["Cache-Control"] = "no-store"
+    return response

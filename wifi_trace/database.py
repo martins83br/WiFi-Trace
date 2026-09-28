@@ -594,3 +594,294 @@ def get_snapshot_index(limit: int = 250) -> list[dict]:
         ).fetchall()
 
     return [dict(row) for row in rows]
+
+
+def init_device_database():
+    """Create device-observation tables used by Device Passport."""
+    init_database()
+
+    with get_connection() as connection:
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS observed_devices (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                device_key TEXT NOT NULL UNIQUE,
+                device_type TEXT NOT NULL,
+                display_name TEXT,
+                first_seen TEXT NOT NULL,
+                last_seen TEXT NOT NULL,
+                observation_count INTEGER NOT NULL DEFAULT 0
+            )
+            """
+        )
+
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS device_observations (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                device_id INTEGER NOT NULL,
+                observed_at TEXT NOT NULL,
+                ip_address TEXT,
+                mac_address TEXT,
+                hostname TEXT,
+                source TEXT NOT NULL,
+                evidence_note TEXT,
+                FOREIGN KEY(device_id)
+                    REFERENCES observed_devices(id)
+            )
+            """
+        )
+
+        connection.execute(
+            """
+            CREATE INDEX IF NOT EXISTS
+            idx_device_observations_device
+            ON device_observations(device_id, observed_at)
+            """
+        )
+
+
+def observe_device(
+    device_key: str,
+    device_type: str,
+    display_name: str,
+    ip_address: str | None,
+    source: str,
+    mac_address: str | None = None,
+    hostname: str | None = None,
+    evidence_note: str | None = None,
+    observed_at: str | None = None,
+) -> int:
+    """Store one defensible device observation."""
+
+    init_device_database()
+
+    observed_at = observed_at or utc_now()
+
+    with get_connection() as connection:
+        existing = connection.execute(
+            """
+            SELECT id
+            FROM observed_devices
+            WHERE device_key = ?
+            """,
+            (device_key,),
+        ).fetchone()
+
+        if existing:
+            device_id = existing["id"]
+
+            connection.execute(
+                """
+                UPDATE observed_devices
+                SET
+                    last_seen = ?,
+                    observation_count = observation_count + 1,
+                    display_name = ?
+                WHERE id = ?
+                """,
+                (
+                    observed_at,
+                    display_name,
+                    device_id,
+                ),
+            )
+        else:
+            cursor = connection.execute(
+                """
+                INSERT INTO observed_devices (
+                    device_key,
+                    device_type,
+                    display_name,
+                    first_seen,
+                    last_seen,
+                    observation_count
+                )
+                VALUES (?, ?, ?, ?, ?, 1)
+                """,
+                (
+                    device_key,
+                    device_type,
+                    display_name,
+                    observed_at,
+                    observed_at,
+                ),
+            )
+
+            device_id = cursor.lastrowid
+
+        connection.execute(
+            """
+            INSERT INTO device_observations (
+                device_id,
+                observed_at,
+                ip_address,
+                mac_address,
+                hostname,
+                source,
+                evidence_note
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                device_id,
+                observed_at,
+                ip_address,
+                mac_address,
+                hostname,
+                source,
+                evidence_note,
+            ),
+        )
+
+    return device_id
+
+
+def record_core_devices(network: dict):
+    """
+    Record devices for which the local collector has direct evidence.
+
+    This intentionally does NOT claim to enumerate every device connected
+    to the network.
+    """
+
+    import socket
+
+    observed_at = utc_now()
+
+    local_ip = network.get("ip_address")
+    interface = network.get("interface")
+
+    if local_ip:
+        hostname = socket.gethostname()
+
+        observe_device(
+            device_key="local-host",
+            device_type="Local Host",
+            display_name=hostname or "This Computer",
+            ip_address=local_ip,
+            hostname=hostname,
+            source="Local Interface",
+            evidence_note=(
+                f"IPv4 address observed on local interface "
+                f"{interface or 'unknown'}."
+            ),
+            observed_at=observed_at,
+        )
+
+    gateway = network.get("gateway")
+
+    if gateway:
+        observe_device(
+            device_key=f"gateway:{gateway}",
+            device_type="Gateway",
+            display_name="Network Gateway",
+            ip_address=gateway,
+            source="Default Route",
+            evidence_note=(
+                "Gateway observed from the operating system "
+                "default IPv4 route."
+            ),
+            observed_at=observed_at,
+        )
+
+
+def get_observed_devices() -> list[dict]:
+    init_device_database()
+
+    with get_connection() as connection:
+        rows = connection.execute(
+            """
+            SELECT
+                d.id,
+                d.device_key,
+                d.device_type,
+                d.display_name,
+                d.first_seen,
+                d.last_seen,
+                d.observation_count,
+                (
+                    SELECT o.ip_address
+                    FROM device_observations o
+                    WHERE o.device_id = d.id
+                    ORDER BY o.id DESC
+                    LIMIT 1
+                ) AS latest_ip,
+                (
+                    SELECT o.mac_address
+                    FROM device_observations o
+                    WHERE o.device_id = d.id
+                      AND o.mac_address IS NOT NULL
+                    ORDER BY o.id DESC
+                    LIMIT 1
+                ) AS latest_mac,
+                (
+                    SELECT o.source
+                    FROM device_observations o
+                    WHERE o.device_id = d.id
+                    ORDER BY o.id DESC
+                    LIMIT 1
+                ) AS latest_source
+            FROM observed_devices d
+            ORDER BY d.last_seen DESC
+            """
+        ).fetchall()
+
+    return [dict(row) for row in rows]
+
+
+def get_device_passport(device_id: int) -> dict | None:
+    init_device_database()
+
+    with get_connection() as connection:
+        device = connection.execute(
+            """
+            SELECT *
+            FROM observed_devices
+            WHERE id = ?
+            """,
+            (device_id,),
+        ).fetchone()
+
+        if not device:
+            return None
+
+        observations = connection.execute(
+            """
+            SELECT
+                id,
+                observed_at,
+                ip_address,
+                mac_address,
+                hostname,
+                source,
+                evidence_note
+            FROM device_observations
+            WHERE device_id = ?
+            ORDER BY id DESC
+            LIMIT 250
+            """,
+            (device_id,),
+        ).fetchall()
+
+        ips = connection.execute(
+            """
+            SELECT
+                ip_address,
+                MIN(observed_at) AS first_seen,
+                MAX(observed_at) AS last_seen,
+                COUNT(*) AS observations
+            FROM device_observations
+            WHERE device_id = ?
+              AND ip_address IS NOT NULL
+            GROUP BY ip_address
+            ORDER BY last_seen DESC
+            """,
+            (device_id,),
+        ).fetchall()
+
+    result = dict(device)
+    result["observations"] = [dict(row) for row in observations]
+    result["ip_history"] = [dict(row) for row in ips]
+
+    return result

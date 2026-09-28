@@ -1,46 +1,61 @@
+from __future__ import annotations
+
 import threading
 from datetime import datetime, timezone
 
 from wifi_trace.collectors.macos import collect_network_info
-from wifi_trace.database import save_snapshot
+from wifi_trace.database import record_core_devices, save_snapshot
 
 
 class NetworkMonitor:
     def __init__(self, interval: int = 30):
         self.interval = interval
         self._stop_event = threading.Event()
-        self._thread = None
-        self.last_observation = None
-        self.last_error = None
+        self._thread: threading.Thread | None = None
+        self._lock = threading.Lock()
 
-    @property
-    def running(self) -> bool:
-        return (
-            self._thread is not None
-            and self._thread.is_alive()
-            and not self._stop_event.is_set()
-        )
+        self.running = False
+        self.last_observation: str | None = None
+        self.last_error: str | None = None
 
-    def _collect(self):
+    def _collect(self) -> None:
         try:
             network = collect_network_info()
-            result = save_snapshot(network)
 
-            self.last_observation = result["observed_at"]
-            self.last_error = None
+            # Preserve the network state in forensic history.
+            save_snapshot(network)
+
+            # Record only devices supported by direct local evidence.
+            record_core_devices(network)
+
+            with self._lock:
+                self.last_observation = datetime.now(
+                    timezone.utc
+                ).isoformat()
+                self.last_error = None
 
         except Exception as exc:
-            self.last_error = str(exc)
+            # A collector failure must not terminate the monitoring thread.
+            with self._lock:
+                self.last_error = (
+                    f"{type(exc).__name__}: {exc}"
+                )
 
-    def _loop(self):
-        # Record immediately when the application starts.
-        self._collect()
+    def _loop(self) -> None:
+        self.running = True
 
-        while not self._stop_event.wait(self.interval):
+        try:
+            # Collect immediately when the monitor starts.
             self._collect()
 
-    def start(self):
-        if self.running:
+            while not self._stop_event.wait(self.interval):
+                self._collect()
+
+        finally:
+            self.running = False
+
+    def start(self) -> None:
+        if self._thread and self._thread.is_alive():
             return
 
         self._stop_event.clear()
@@ -53,19 +68,22 @@ class NetworkMonitor:
 
         self._thread.start()
 
-    def stop(self):
+    def stop(self) -> None:
         self._stop_event.set()
 
         if self._thread and self._thread.is_alive():
-            self._thread.join(timeout=3)
+            self._thread.join(timeout=5)
+
+        self.running = False
 
     def status(self) -> dict:
-        return {
-            "running": self.running,
-            "interval": self.interval,
-            "last_observation": self.last_observation,
-            "last_error": self.last_error,
-        }
+        with self._lock:
+            return {
+                "running": self.running,
+                "interval": self.interval,
+                "last_observation": self.last_observation,
+                "last_error": self.last_error,
+            }
 
 
 monitor = NetworkMonitor(interval=30)
