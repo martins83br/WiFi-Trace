@@ -15,7 +15,12 @@ def _run(command: list[str]) -> str:
             timeout=10,
             check=False,
         )
-        return result.stdout.strip()
+        output = result.stdout.strip()
+
+        if not output:
+            output = result.stderr.strip()
+
+        return output
     except (OSError, subprocess.TimeoutExpired):
         return ""
 
