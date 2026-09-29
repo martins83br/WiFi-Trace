@@ -13,6 +13,7 @@ Principles:
 
 from __future__ import annotations
 
+import hmac
 import hashlib
 import json
 from datetime import datetime, timezone
@@ -132,7 +133,7 @@ def verify_evidence(envelope: dict) -> bool:
 
     calculated = calculate_sha256(candidate)
 
-    return hashlib.compare_digest(
+    return hmac.compare_digest(
         supplied_hash,
         calculated,
     )

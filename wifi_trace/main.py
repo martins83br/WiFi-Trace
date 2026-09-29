@@ -59,6 +59,31 @@ def dashboard():
     info = get_system_info()
     network = collect_network_info()
 
+    raw_signal = network.get("signal")
+    raw_noise = network.get("noise")
+
+    signal = (
+        raw_signal
+        if isinstance(raw_signal, (int, float))
+        and -100 <= raw_signal <= -1
+        else None
+    )
+
+    noise = (
+        raw_noise
+        if isinstance(raw_noise, (int, float))
+        and -120 <= raw_noise <= -1
+        else None
+    )
+
+    snr = (
+        signal - noise
+        if signal is not None
+        and noise is not None
+        and 0 <= signal - noise <= 100
+        else None
+    )
+
     interface_html = ""
 
     for interface in info["interfaces"]:
@@ -107,15 +132,38 @@ body {{
 
 .menu {{
     padding: 15px 25px;
-    color: #9aa7b4;
 }}
 
-.menu div {{
+.menu a,
+.menu .coming-soon {{
+    display: block;
     padding: 13px 0;
+    color: #9aa7b4;
+    text-decoration: none;
+    transition:
+        color 0.15s ease,
+        transform 0.15s ease;
 }}
 
-.active {{
+.menu a:hover {{
     color: #39d98a;
+    transform: translateX(3px);
+}}
+
+.menu a.active {{
+    color: #39d98a;
+    font-weight: bold;
+}}
+
+.menu .coming-soon {{
+    color: #596673;
+    cursor: default;
+}}
+
+.menu .coming-soon span {{
+    margin-left: 6px;
+    font-size: 9px;
+    color: #596673;
 }}
 
 .content {{
@@ -208,14 +256,43 @@ WiFi<span>-Trace</span>
 
 <div class="menu">
 
-<div class="active">▣ Overview</div>
-<div>◉ Networks</div>
-<div>◈ Devices</div>
-<div>⌚ Timeline</div>
-<div>⚠ Security</div>
-<div>◇ Investigations</div>
-<div>▤ Evidence</div>
-<div>▧ Reports</div>
+<a class="active" href="/">
+▣ Overview
+</a>
+
+<a href="/networks">
+◉ Networks
+</a>
+
+<a href="/devices">
+◈ Devices
+</a>
+
+<a href="/timeline">
+⌚ Timeline
+</a>
+
+<a href="/time-machine">
+◫ Time Machine
+</a>
+
+<a href="/network-diff">
+⇄ Network Diff
+</a>
+
+<a href="/investigations">
+◇ Investigations
+</a>
+
+<div class="coming-soon">
+▤ Evidence
+<span>COMING SOON</span>
+</div>
+
+<div class="coming-soon">
+▧ Reports
+<span>COMING SOON</span>
+</div>
 
 </div>
 
@@ -242,13 +319,150 @@ Wireless Network Forensics & Timeline Analysis
 </div>
 
 <div class="card">
-<div class="card-title">AIRTRACE ENGINE</div>
+<div class="card-title">WIFI-TRACE ENGINE</div>
 <div class="card-value online">● ONLINE</div>
 </div>
 
 <div class="card">
 <div class="card-title">PYTHON</div>
 <div class="card-value">{info["python"]}</div>
+</div>
+
+</div>
+
+
+<div class="panel">
+
+<h2>Network Health</h2>
+
+<div id="health-loading">
+Analyzing current network evidence...
+</div>
+
+<div
+    id="health-content"
+    style="display:none;"
+>
+
+<div
+    style="
+        display:grid;
+        grid-template-columns:
+            repeat(3, 1fr);
+        gap:16px;
+        margin-top:18px;
+    "
+>
+
+<div
+    style="
+        background:#0b1118;
+        border:1px solid #263241;
+        border-radius:8px;
+        padding:18px;
+    "
+>
+<div
+    style="
+        color:#8996a3;
+        font-size:12px;
+    "
+>
+SECURITY POSTURE
+</div>
+
+<div
+    id="health-posture"
+    style="
+        font-size:24px;
+        font-weight:bold;
+        margin-top:8px;
+    "
+>
+—
+</div>
+</div>
+
+<div
+    style="
+        background:#0b1118;
+        border:1px solid #263241;
+        border-radius:8px;
+        padding:18px;
+    "
+>
+<div
+    style="
+        color:#8996a3;
+        font-size:12px;
+    "
+>
+ATTENTION SCORE
+</div>
+
+<div
+    id="health-score"
+    style="
+        font-size:24px;
+        font-weight:bold;
+        margin-top:8px;
+    "
+>
+—
+</div>
+</div>
+
+<div
+    style="
+        background:#0b1118;
+        border:1px solid #263241;
+        border-radius:8px;
+        padding:18px;
+    "
+>
+<div
+    style="
+        color:#8996a3;
+        font-size:12px;
+    "
+>
+ACTIONABLE FINDINGS
+</div>
+
+<div
+    id="health-findings-count"
+    style="
+        font-size:24px;
+        font-weight:bold;
+        margin-top:8px;
+    "
+>
+—
+</div>
+</div>
+
+</div>
+
+<div
+    id="health-summary"
+    style="
+        margin-top:20px;
+    "
+></div>
+
+<div
+    style="
+        margin-top:18px;
+        color:#6f7d89;
+        font-size:12px;
+        line-height:1.6;
+    "
+>
+The attention score is based on deterministic
+observations and does not represent a probability
+of compromise.
+</div>
+
 </div>
 
 </div>
@@ -302,17 +516,17 @@ Wireless Network Forensics & Timeline Analysis
 
 <tr>
 <td>Signal</td>
-<td>{str(network["signal"]) + " dBm" if network["signal"] is not None else "Unavailable"}</td>
+<td>{str(signal) + " dBm" if signal is not None else "Unavailable"}</td>
 </tr>
 
 <tr>
 <td>Noise</td>
-<td>{str(network["noise"]) + " dBm" if network["noise"] is not None else "Unavailable"}</td>
+<td>{str(noise) + " dBm" if noise is not None else "Unavailable"}</td>
 </tr>
 
 <tr>
 <td>SNR</td>
-<td>{str(network["signal"] - network["noise"]) + " dB" if network["signal"] is not None and network["noise"] is not None else "Unavailable"}</td>
+<td>{str(snr) + " dB" if snr is not None else "Unavailable"}</td>
 </tr>
 
 <tr>
@@ -385,6 +599,246 @@ Wireless Network Forensics & Timeline Analysis
 </div>
 
 </div>
+
+<script>
+async function loadNetworkHealth() {{
+    const loading =
+        document.getElementById(
+            "health-loading"
+        );
+
+    const content =
+        document.getElementById(
+            "health-content"
+        );
+
+    const posture =
+        document.getElementById(
+            "health-posture"
+        );
+
+    const score =
+        document.getElementById(
+            "health-score"
+        );
+
+    const count =
+        document.getElementById(
+            "health-findings-count"
+        );
+
+    const summary =
+        document.getElementById(
+            "health-summary"
+        );
+
+    try {{
+        const response = await fetch(
+            "/api/network-health",
+            {{
+                cache: "no-store"
+            }}
+        );
+
+        const data =
+            await response.json();
+
+        if (!response.ok) {{
+            throw new Error(
+                "Assessment unavailable"
+            );
+        }}
+
+        const assessment =
+            data.assessment;
+
+        posture.textContent =
+            assessment.posture;
+
+        score.textContent =
+            assessment.attention_score +
+            " / 100";
+
+        count.textContent =
+            assessment.actionable_count;
+
+        if (
+            assessment.posture ===
+            "HEALTHY"
+        ) {{
+            posture.style.color =
+                "#39d98a";
+        }} else if (
+            assessment.posture ===
+            "ATTENTION"
+        ) {{
+            posture.style.color =
+                "#f2cc60";
+        }} else {{
+            posture.style.color =
+                "#ff7b72";
+        }}
+
+        summary.innerHTML = "";
+
+        if (
+            assessment.actionable.length
+            === 0
+        ) {{
+            const clean =
+                document.createElement(
+                    "div"
+                );
+
+            clean.style.padding = "16px";
+            clean.style.background =
+                "#0b1118";
+            clean.style.border =
+                "1px solid #263241";
+            clean.style.borderRadius =
+                "8px";
+
+            clean.innerHTML =
+                "<strong>" +
+                "No actionable findings" +
+                "</strong><br>" +
+                "<span style='" +
+                "color:#8996a3;" +
+                "font-size:13px;" +
+                "line-height:1.6;" +
+                "'>" +
+                "No deterministic rule " +
+                "currently requires attention." +
+                "</span>";
+
+            summary.appendChild(clean);
+
+        }} else {{
+            assessment.actionable
+                .forEach((finding) => {{
+                    const item =
+                        document.createElement(
+                            "div"
+                        );
+
+                    item.style.padding =
+                        "16px";
+
+                    item.style.marginTop =
+                        "10px";
+
+                    item.style.background =
+                        "#0b1118";
+
+                    item.style.border =
+                        "1px solid #263241";
+
+                    item.style.borderRadius =
+                        "8px";
+
+                    const severityColor =
+                        finding.severity ===
+                        "HIGH"
+                            ? "#ff7b72"
+                            : "#f2cc60";
+
+                    const title =
+                        document.createElement(
+                            "div"
+                        );
+
+                    title.style.fontWeight =
+                        "bold";
+
+                    title.style.color =
+                        severityColor;
+
+                    title.textContent =
+                        finding.severity +
+                        " — " +
+                        finding.title;
+
+                    const evidence =
+                        document.createElement(
+                            "div"
+                        );
+
+                    evidence.style.marginTop =
+                        "8px";
+
+                    evidence.style.fontSize =
+                        "13px";
+
+                    evidence.textContent =
+                        "Evidence: " +
+                        finding.evidence;
+
+                    const explanation =
+                        document.createElement(
+                            "div"
+                        );
+
+                    explanation.style.marginTop =
+                        "6px";
+
+                    explanation.style.color =
+                        "#8996a3";
+
+                    explanation.style.fontSize =
+                        "13px";
+
+                    explanation.style.lineHeight =
+                        "1.5";
+
+                    explanation.textContent =
+                        finding.explanation;
+
+                    const recommendation =
+                        document.createElement(
+                            "div"
+                        );
+
+                    recommendation.style.marginTop =
+                        "8px";
+
+                    recommendation.style.fontSize =
+                        "13px";
+
+                    recommendation.textContent =
+                        "Next step: " +
+                        finding.recommendation;
+
+                    item.appendChild(title);
+                    item.appendChild(evidence);
+                    item.appendChild(
+                        explanation
+                    );
+                    item.appendChild(
+                        recommendation
+                    );
+
+                    summary.appendChild(item);
+                }});
+        }}
+
+        loading.style.display =
+            "none";
+
+        content.style.display =
+            "block";
+
+    }} catch (error) {{
+        loading.textContent =
+            "Network health assessment " +
+            "is currently unavailable.";
+    }}
+}}
+
+document.addEventListener(
+    "DOMContentLoaded",
+    loadNetworkHealth
+);
+</script>
 
 </body>
 
@@ -1058,5 +1512,168 @@ def add_snapshot_evidence_api(
     )
 
     response.headers["Cache-Control"] = "no-store"
+
+    return response
+
+
+# === WIFI-TRACE EVIDENCE INTEGRITY API V2 ===
+
+from wifi_trace.database import (
+    get_evidence_item,
+    get_evidence_verifications,
+    get_investigation_integrity,
+    verify_stored_evidence,
+)
+
+
+@app.post(
+    "/api/evidence/{evidence_id}/verify"
+)
+def verify_evidence_api(
+    evidence_id: int,
+):
+    try:
+        result = verify_stored_evidence(
+            evidence_id
+        )
+
+    except ValueError as exc:
+        return JSONResponse(
+            status_code=404,
+            content={
+                "success": False,
+                "detail": str(exc),
+            },
+        )
+
+    status_code = (
+        200
+        if result["result"] == "VERIFIED"
+        else 409
+    )
+
+    response = JSONResponse(
+        status_code=status_code,
+        content={
+            "success":
+                result["result"]
+                == "VERIFIED",
+            **result,
+        },
+    )
+
+    response.headers[
+        "Cache-Control"
+    ] = "no-store"
+
+    return response
+
+
+@app.get(
+    "/api/evidence/{evidence_id}/verifications"
+)
+def evidence_verifications_api(
+    evidence_id: int,
+):
+    evidence = get_evidence_item(
+        evidence_id
+    )
+
+    if evidence is None:
+        return JSONResponse(
+            status_code=404,
+            content={
+                "success": False,
+                "detail":
+                    "Evidence item not found.",
+            },
+        )
+
+    response = JSONResponse(
+        content={
+            "success": True,
+            "evidence_id":
+                evidence_id,
+            "verifications":
+                get_evidence_verifications(
+                    evidence_id
+                ),
+        }
+    )
+
+    response.headers[
+        "Cache-Control"
+    ] = "no-store"
+
+    return response
+
+
+@app.post(
+    "/api/investigations/{investigation_id}/verify"
+)
+def verify_investigation_api(
+    investigation_id: int,
+):
+    try:
+        result = (
+            get_investigation_integrity(
+                investigation_id
+            )
+        )
+
+    except ValueError as exc:
+        return JSONResponse(
+            status_code=404,
+            content={
+                "success": False,
+                "detail": str(exc),
+            },
+        )
+
+    response = JSONResponse(
+        content={
+            "success":
+                result["failed"] == 0,
+            **result,
+        }
+    )
+
+    response.headers[
+        "Cache-Control"
+    ] = "no-store"
+
+    return response
+
+
+# === WIFI-TRACE NETWORK HEALTH API V1 ===
+
+from wifi_trace.risk_engine import (
+    evaluate_network,
+)
+
+
+@app.get("/api/network-health")
+def network_health_api():
+    network = collect_network_info()
+
+    events = get_recent_events(
+        limit=25
+    )
+
+    assessment = evaluate_network(
+        network,
+        events,
+    )
+
+    response = JSONResponse(
+        content={
+            "success": True,
+            "assessment": assessment,
+        }
+    )
+
+    response.headers[
+        "Cache-Control"
+    ] = "no-store"
 
     return response

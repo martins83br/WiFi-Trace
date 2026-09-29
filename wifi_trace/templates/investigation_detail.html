@@ -421,3 +421,168 @@ document
 
 </body>
 </html>
+
+<script>
+async function verifyInvestigationIntegrity() {
+    const button =
+        document.getElementById(
+            "verify-investigation"
+        );
+
+    const output =
+        document.getElementById(
+            "integrity-result"
+        );
+
+    if (!button || !output) {
+        return;
+    }
+
+    button.disabled = true;
+    button.textContent =
+        "Verifying Evidence...";
+
+    output.textContent =
+        "Recalculating SHA-256 hashes...";
+
+    try {
+        const response = await fetch(
+            "/api/investigations/" +
+            "{{ investigation.id }}" +
+            "/verify",
+            {
+                method: "POST",
+            }
+        );
+
+        const data =
+            await response.json();
+
+        if (!response.ok) {
+            output.textContent =
+                data.detail ||
+                "Verification failed.";
+
+            return;
+        }
+
+        if (
+            data.status === "VERIFIED"
+        ) {
+            output.innerHTML =
+                "<strong>" +
+                "✓ VERIFIED" +
+                "</strong><br>" +
+                data.verified +
+                " evidence item(s) " +
+                "passed SHA-256 " +
+                "integrity verification.";
+        } else if (
+            data.status === "EMPTY"
+        ) {
+            output.textContent =
+                "No evidence available " +
+                "for verification.";
+        } else {
+            output.innerHTML =
+                "<strong>" +
+                "⚠ INTEGRITY FAILURE" +
+                "</strong><br>" +
+                data.failed +
+                " evidence item(s) " +
+                "failed verification.";
+        }
+
+    } catch (error) {
+        output.textContent =
+            "Unable to complete " +
+            "integrity verification.";
+
+    } finally {
+        button.disabled = false;
+        button.textContent =
+            "Verify Evidence Integrity";
+    }
+}
+</script>
+
+<style>
+.integrity-control {
+    position: fixed;
+    right: 28px;
+    bottom: 28px;
+    width: 310px;
+    padding: 18px;
+    background: #111b26;
+    border: 1px solid #344455;
+    border-radius: 10px;
+    box-shadow:
+        0 10px 35px
+        rgba(0, 0, 0, 0.35);
+    z-index: 1000;
+}
+
+.integrity-title {
+    font-weight: bold;
+    margin-bottom: 8px;
+}
+
+.integrity-description {
+    color: #8996a3;
+    font-size: 12px;
+    line-height: 1.5;
+    margin-bottom: 12px;
+}
+
+.integrity-result {
+    margin-top: 12px;
+    color: #39d98a;
+    font-size: 12px;
+    line-height: 1.5;
+    word-break: break-word;
+}
+
+.integrity-control button {
+    width: 100%;
+}
+
+.integrity-control button:disabled {
+    opacity: 0.55;
+    cursor: wait;
+}
+
+@media (max-width: 900px) {
+    .integrity-control {
+        position: static;
+        width: auto;
+        margin: 25px;
+    }
+}
+</style>
+
+<div class="integrity-control">
+    <div class="integrity-title">
+        Evidence Integrity
+    </div>
+
+    <div class="integrity-description">
+        Recalculate SHA-256 hashes for every
+        preserved evidence item in this
+        investigation.
+    </div>
+
+    <button
+        id="verify-investigation"
+        type="button"
+        onclick="
+            verifyInvestigationIntegrity()
+        "
+    >
+        Verify Evidence Integrity
+    </button>
+
+    <div
+        id="integrity-result"
+        class="integrity-result"
+    ></div>
+</div>

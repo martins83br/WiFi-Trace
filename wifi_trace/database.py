@@ -1790,3 +1790,260 @@ def add_snapshot_to_investigation(
         ),
         "sha256": envelope["sha256"],
     }
+
+
+# === WIFI-TRACE EVIDENCE INTEGRITY V2 ===
+
+def init_evidence_integrity_database() -> None:
+    """
+    Create append-only verification history for preserved evidence.
+
+    Verification records do not modify the original evidence payload.
+    """
+    init_investigation_database()
+
+    with get_connection() as connection:
+        connection.executescript(
+            """
+            CREATE TABLE IF NOT EXISTS evidence_verifications (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                evidence_id INTEGER NOT NULL,
+                verified_at TEXT NOT NULL,
+                expected_sha256 TEXT NOT NULL,
+                calculated_sha256 TEXT NOT NULL,
+                result TEXT NOT NULL,
+                verification_method TEXT NOT NULL,
+                FOREIGN KEY(evidence_id)
+                    REFERENCES investigation_evidence(id)
+            );
+
+            CREATE INDEX IF NOT EXISTS
+                idx_evidence_verifications_evidence
+            ON evidence_verifications(
+                evidence_id,
+                verified_at
+            );
+            """
+        )
+
+
+def get_evidence_item(
+    evidence_id: int,
+) -> dict | None:
+    init_evidence_integrity_database()
+
+    with get_connection() as connection:
+        row = connection.execute(
+            """
+            SELECT
+                e.*,
+                i.title AS investigation_title
+            FROM investigation_evidence AS e
+            JOIN investigations AS i
+                ON i.id = e.investigation_id
+            WHERE e.id = ?
+            """,
+            (evidence_id,),
+        ).fetchone()
+
+    return dict(row) if row else None
+
+
+def verify_stored_evidence(
+    evidence_id: int,
+) -> dict:
+    """
+    Rebuild the original evidence envelope from the stored record,
+    calculate SHA-256 again and compare it with the preserved hash.
+
+    A verification event is appended to the chain-of-custody history.
+    """
+    import hashlib
+    import json
+
+    from wifi_trace.evidence import calculate_sha256
+
+    evidence = get_evidence_item(evidence_id)
+
+    if evidence is None:
+        raise ValueError(
+            "Evidence item not found."
+        )
+
+    try:
+        payload = json.loads(
+            evidence["payload_json"]
+        )
+    except (
+        json.JSONDecodeError,
+        TypeError,
+    ):
+        payload = None
+
+    if not isinstance(payload, dict):
+        calculated_hash = hashlib.sha256(
+            str(
+                evidence.get(
+                    "payload_json",
+                    "",
+                )
+            ).encode("utf-8")
+        ).hexdigest()
+
+        result = "FAILED"
+
+    else:
+        envelope_without_hash = {
+            "schema":
+                "wifi-trace-evidence-v1",
+            "evidence_type":
+                evidence["evidence_type"],
+            "source":
+                evidence["source"],
+            "captured_at":
+                evidence["captured_at"],
+            "payload":
+                payload,
+        }
+
+        calculated_hash = calculate_sha256(
+            envelope_without_hash
+        )
+
+        result = (
+            "VERIFIED"
+            if calculated_hash
+            == evidence["sha256"]
+            else "FAILED"
+        )
+
+    verified_at = utc_now()
+
+    with get_connection() as connection:
+        cursor = connection.execute(
+            """
+            INSERT INTO evidence_verifications (
+                evidence_id,
+                verified_at,
+                expected_sha256,
+                calculated_sha256,
+                result,
+                verification_method
+            )
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                evidence_id,
+                verified_at,
+                evidence["sha256"],
+                calculated_hash,
+                result,
+                "SHA-256 deterministic envelope verification",
+            ),
+        )
+
+    return {
+        "verification_id":
+            int(cursor.lastrowid),
+        "evidence_id":
+            evidence_id,
+        "verified_at":
+            verified_at,
+        "expected_sha256":
+            evidence["sha256"],
+        "calculated_sha256":
+            calculated_hash,
+        "result":
+            result,
+        "verification_method":
+            (
+                "SHA-256 deterministic "
+                "envelope verification"
+            ),
+    }
+
+
+def get_evidence_verifications(
+    evidence_id: int,
+) -> list[dict]:
+    init_evidence_integrity_database()
+
+    with get_connection() as connection:
+        rows = connection.execute(
+            """
+            SELECT *
+            FROM evidence_verifications
+            WHERE evidence_id = ?
+            ORDER BY id DESC
+            LIMIT 250
+            """,
+            (evidence_id,),
+        ).fetchall()
+
+    return [
+        dict(row)
+        for row in rows
+    ]
+
+
+def get_investigation_integrity(
+    investigation_id: int,
+) -> dict:
+    """
+    Verify every evidence item belonging to an investigation.
+
+    This intentionally creates a verification record for each item,
+    producing an auditable verification history.
+    """
+    investigation = get_investigation(
+        investigation_id
+    )
+
+    if investigation is None:
+        raise ValueError(
+            "Investigation not found."
+        )
+
+    results = []
+
+    for evidence in investigation["evidence"]:
+        results.append(
+            verify_stored_evidence(
+                evidence["id"]
+            )
+        )
+
+    verified = sum(
+        1
+        for item in results
+        if item["result"] == "VERIFIED"
+    )
+
+    failed = sum(
+        1
+        for item in results
+        if item["result"] == "FAILED"
+    )
+
+    return {
+        "investigation_id":
+            investigation_id,
+        "evidence_count":
+            len(results),
+        "verified":
+            verified,
+        "failed":
+            failed,
+        "status":
+            (
+                "VERIFIED"
+                if results and failed == 0
+                else
+                "EMPTY"
+                if not results
+                else
+                "FAILED"
+            ),
+        "results":
+            results,
+    }

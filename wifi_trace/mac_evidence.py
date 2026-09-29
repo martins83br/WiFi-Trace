@@ -38,33 +38,91 @@ class MacEvidence:
         return asdict(self)
 
 
-def normalize_mac(value: str | None) -> str | None:
+def normalize_mac(
+    value: str | None,
+) -> str | None:
     """
-    Normalize common MAC representations to AA:BB:CC:DD:EE:FF.
+    Normalize common MAC-address representations.
 
     Accepted examples:
-        aa:bb:cc:dd:ee:ff
-        aa-bb-cc-dd-ee-ff
-        aabb.ccdd.eeff
-        aabbccddeeff
+    AA:BB:CC:DD:EE:FF
+    aa-bb-cc-dd-ee-ff
+    aabb.ccdd.eeff
+    AABBCCDDEEFF
+    0:1a:2b:3c:4d:5e
     """
 
     if value is None:
         return None
 
-    value = value.strip()
+    candidate = str(value).strip()
 
-    if not value:
+    if not candidate:
         return None
 
-    compact = re.sub(r"[:.\-\s]", "", value).upper()
+    # Cisco dotted notation.
+    if "." in candidate:
+        compact = candidate.replace(".", "")
 
-    if not _MAC_HEX_RE.fullmatch(compact):
-        return None
+        if not re.fullmatch(
+            r"[0-9A-Fa-f]{12}",
+            compact,
+        ):
+            return None
+
+        octets = [
+            compact[index:index + 2]
+            for index in range(
+                0,
+                12,
+                2,
+            )
+        ]
+
+    # Colon/hyphen notation. Each octet may contain
+    # one or two hexadecimal characters.
+    elif ":" in candidate or "-" in candidate:
+        parts = re.split(
+            r"[:-]",
+            candidate,
+        )
+
+        if len(parts) != 6:
+            return None
+
+        if not all(
+            re.fullmatch(
+                r"[0-9A-Fa-f]{1,2}",
+                part,
+            )
+            for part in parts
+        ):
+            return None
+
+        octets = [
+            part.zfill(2)
+            for part in parts
+        ]
+
+    else:
+        if not re.fullmatch(
+            r"[0-9A-Fa-f]{12}",
+            candidate,
+        ):
+            return None
+
+        octets = [
+            candidate[index:index + 2]
+            for index in range(
+                0,
+                12,
+                2,
+            )
+        ]
 
     return ":".join(
-        compact[index:index + 2]
-        for index in range(0, 12, 2)
+        part.upper()
+        for part in octets
     )
 
 
