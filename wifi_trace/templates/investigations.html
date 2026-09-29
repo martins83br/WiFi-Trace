@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta
+    name="viewport"
+    content="width=device-width, initial-scale=1"
+>
+<title>Investigations | WiFi-Trace</title>
+
+<style>
+* { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    background: #0b1118;
+    color: #e6edf3;
+    font-family: Arial, Helvetica, sans-serif;
+}
+
+.sidebar {
+    position: fixed;
+    width: 230px;
+    height: 100vh;
+    background: #101820;
+    border-right: 1px solid #263241;
+}
+
+.logo {
+    padding: 28px;
+    font-size: 25px;
+    font-weight: bold;
+}
+
+.logo span { color: #39d98a; }
+
+.menu { padding: 15px 25px; }
+
+.menu a {
+    display: block;
+    padding: 13px 0;
+    color: #9aa7b4;
+    text-decoration: none;
+}
+
+.menu a:hover,
+.menu .active {
+    color: #39d98a;
+}
+
+.content {
+    margin-left: 230px;
+    padding: 40px;
+}
+
+.title {
+    font-size: 30px;
+    font-weight: bold;
+}
+
+.subtitle {
+    margin-top: 6px;
+    color: #8b98a5;
+}
+
+.panel {
+    margin-top: 28px;
+    padding: 24px;
+    background: #111b26;
+    border: 1px solid #243241;
+    border-radius: 10px;
+}
+
+input,
+textarea {
+    width: 100%;
+    padding: 11px;
+    margin-top: 7px;
+    margin-bottom: 15px;
+    background: #0b1118;
+    color: #e6edf3;
+    border: 1px solid #344455;
+    border-radius: 6px;
+}
+
+textarea {
+    min-height: 90px;
+    resize: vertical;
+}
+
+button {
+    padding: 11px 18px;
+    background: #39d98a;
+    color: #07120d;
+    border: 0;
+    border-radius: 6px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+th,
+td {
+    padding: 13px;
+    text-align: left;
+    border-bottom: 1px solid #263241;
+}
+
+th {
+    color: #8996a3;
+}
+
+a {
+    color: #39d98a;
+}
+
+.status {
+    font-weight: bold;
+    color: #39d98a;
+}
+
+.note {
+    color: #8996a3;
+    font-size: 13px;
+    line-height: 1.6;
+}
+
+@media (max-width: 900px) {
+    .sidebar {
+        position: static;
+        width: 100%;
+        height: auto;
+    }
+
+    .content {
+        margin-left: 0;
+    }
+}
+</style>
+</head>
+
+<body>
+
+<div class="sidebar">
+    <div class="logo">
+        WiFi<span>-Trace</span>
+    </div>
+
+    <div class="menu">
+        <a href="/">▣ Overview</a>
+        <a href="/networks">◉ Networks</a>
+        <a href="/devices">◈ Devices</a>
+        <a href="/timeline">⌚ Timeline</a>
+        <a href="/time-machine">◫ Time Machine</a>
+        <a href="/network-diff">⇄ Network Diff</a>
+        <a
+            class="active"
+            href="/investigations"
+        >
+            ◇ Investigations
+        </a>
+    </div>
+</div>
+
+<div class="content">
+
+    <div class="title">
+        Investigations
+    </div>
+
+    <div class="subtitle">
+        Preserve network evidence in integrity-protected cases.
+    </div>
+
+    <div class="panel">
+        <h2>New Investigation</h2>
+
+        <form id="create-case-form">
+            <label>Title</label>
+
+            <input
+                name="title"
+                maxlength="150"
+                required
+                placeholder="Example: Home Wi-Fi connectivity incident"
+            >
+
+            <label>Description</label>
+
+            <textarea
+                name="description"
+                maxlength="2000"
+                placeholder="Optional investigation context"
+            ></textarea>
+
+            <button type="submit">
+                Create Investigation
+            </button>
+        </form>
+
+        <p class="note" id="message"></p>
+    </div>
+
+    <div class="panel">
+        <h2>Cases</h2>
+
+        {% if investigations %}
+
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Investigation</th>
+                    <th>Status</th>
+                    <th>Evidence</th>
+                    <th>Updated</th>
+                </tr>
+            </thead>
+
+            <tbody>
+            {% for item in investigations %}
+                <tr>
+                    <td>#{{ item.id }}</td>
+
+                    <td>
+                        <a
+                            href="/investigations/{{ item.id }}"
+                        >
+                            {{ item.title }}
+                        </a>
+                    </td>
+
+                    <td class="status">
+                        {{ item.status }}
+                    </td>
+
+                    <td>
+                        {{ item.evidence_count }}
+                    </td>
+
+                    <td class="local-time">
+                        {{ item.updated_at }}
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+
+        {% else %}
+
+        <p class="note">
+            No investigations have been created yet.
+        </p>
+
+        {% endif %}
+    </div>
+
+</div>
+
+<script>
+function localizeTimes() {
+    document
+        .querySelectorAll(".local-time")
+        .forEach((element) => {
+            const date =
+                new Date(element.textContent.trim());
+
+            if (!Number.isNaN(date.getTime())) {
+                element.textContent =
+                    date.toLocaleString();
+            }
+        });
+}
+
+document.addEventListener(
+    "DOMContentLoaded",
+    localizeTimes
+);
+
+document
+    .getElementById("create-case-form")
+    .addEventListener(
+        "submit",
+        async (event) => {
+            event.preventDefault();
+
+            const form = event.target;
+            const message =
+                document.getElementById("message");
+
+            const response = await fetch(
+                "/api/investigations",
+                {
+                    method: "POST",
+                    body: new FormData(form),
+                }
+            );
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                message.textContent =
+                    data.detail ||
+                    "Unable to create investigation.";
+                return;
+            }
+
+            window.location.href =
+                "/investigations/" +
+                data.investigation_id;
+        }
+    );
+</script>
+
+</body>
+</html>

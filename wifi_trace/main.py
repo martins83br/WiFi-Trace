@@ -935,3 +935,128 @@ def network_diff_api(
     response.headers["Cache-Control"] = "no-store"
 
     return response
+
+
+# === WIFI-TRACE INVESTIGATIONS API V1 ===
+
+from wifi_trace.database import (
+    add_snapshot_to_investigation,
+    create_investigation,
+    get_investigation,
+    get_investigations,
+)
+
+
+@app.get("/investigations")
+def investigations_page(
+    request: Request,
+):
+    return templates.TemplateResponse(
+        request=request,
+        name="investigations.html",
+        context={
+            "investigations":
+                get_investigations(),
+            "snapshots":
+                get_snapshot_index(limit=250),
+        },
+    )
+
+
+@app.get("/investigations/{investigation_id}")
+def investigation_page(
+    request: Request,
+    investigation_id: int,
+):
+    investigation = get_investigation(
+        investigation_id
+    )
+
+    if investigation is None:
+        return JSONResponse(
+            status_code=404,
+            content={
+                "detail":
+                    "Investigation not found."
+            },
+        )
+
+    return templates.TemplateResponse(
+        request=request,
+        name="investigation_detail.html",
+        context={
+            "investigation": investigation,
+            "snapshots":
+                get_snapshot_index(limit=250),
+        },
+    )
+
+
+@app.post("/api/investigations")
+def create_investigation_api(
+    title: str = Form(...),
+    description: str = Form(""),
+):
+    try:
+        investigation_id = (
+            create_investigation(
+                title=title,
+                description=description,
+            )
+        )
+    except ValueError as exc:
+        return JSONResponse(
+            status_code=400,
+            content={
+                "success": False,
+                "detail": str(exc),
+            },
+        )
+
+    response = JSONResponse(
+        content={
+            "success": True,
+            "investigation_id":
+                investigation_id,
+        }
+    )
+
+    response.headers["Cache-Control"] = "no-store"
+
+    return response
+
+
+@app.post(
+    "/api/investigations/{investigation_id}/evidence/snapshot"
+)
+def add_snapshot_evidence_api(
+    investigation_id: int,
+    snapshot_id: int = Form(...),
+    note: str = Form(""),
+):
+    try:
+        result = add_snapshot_to_investigation(
+            investigation_id=
+                investigation_id,
+            snapshot_id=snapshot_id,
+            note=note,
+        )
+    except ValueError as exc:
+        return JSONResponse(
+            status_code=400,
+            content={
+                "success": False,
+                "detail": str(exc),
+            },
+        )
+
+    response = JSONResponse(
+        content={
+            "success": True,
+            **result,
+        }
+    )
+
+    response.headers["Cache-Control"] = "no-store"
+
+    return response

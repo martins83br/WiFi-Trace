@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta
+    name="viewport"
+    content="width=device-width, initial-scale=1"
+>
+<title>
+    {{ investigation.title }} | WiFi-Trace
+</title>
+
+<style>
+* { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    background: #0b1118;
+    color: #e6edf3;
+    font-family: Arial, Helvetica, sans-serif;
+}
+
+.sidebar {
+    position: fixed;
+    width: 230px;
+    height: 100vh;
+    background: #101820;
+    border-right: 1px solid #263241;
+}
+
+.logo {
+    padding: 28px;
+    font-size: 25px;
+    font-weight: bold;
+}
+
+.logo span { color: #39d98a; }
+
+.menu { padding: 15px 25px; }
+
+.menu a {
+    display: block;
+    padding: 13px 0;
+    color: #9aa7b4;
+    text-decoration: none;
+}
+
+.menu a:hover,
+.menu .active {
+    color: #39d98a;
+}
+
+.content {
+    margin-left: 230px;
+    padding: 40px;
+}
+
+.title {
+    font-size: 30px;
+    font-weight: bold;
+}
+
+.subtitle {
+    margin-top: 6px;
+    color: #8b98a5;
+}
+
+.panel {
+    margin-top: 28px;
+    padding: 24px;
+    background: #111b26;
+    border: 1px solid #243241;
+    border-radius: 10px;
+}
+
+select,
+textarea {
+    width: 100%;
+    padding: 11px;
+    margin-top: 7px;
+    margin-bottom: 15px;
+    background: #0b1118;
+    color: #e6edf3;
+    border: 1px solid #344455;
+    border-radius: 6px;
+}
+
+textarea {
+    min-height: 80px;
+    resize: vertical;
+}
+
+button {
+    padding: 11px 18px;
+    background: #39d98a;
+    color: #07120d;
+    border: 0;
+    border-radius: 6px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+th,
+td {
+    padding: 13px;
+    text-align: left;
+    border-bottom: 1px solid #263241;
+    vertical-align: top;
+}
+
+th {
+    color: #8996a3;
+}
+
+.hash {
+    font-family: monospace;
+    font-size: 12px;
+    word-break: break-all;
+    color: #79c0ff;
+}
+
+.status {
+    color: #39d98a;
+    font-weight: bold;
+}
+
+.note {
+    color: #8996a3;
+    font-size: 13px;
+    line-height: 1.6;
+}
+
+.meta {
+    display: grid;
+    grid-template-columns:
+        repeat(3, 1fr);
+    gap: 15px;
+}
+
+.meta-card {
+    padding: 16px;
+    background: #0b1118;
+    border: 1px solid #263241;
+    border-radius: 7px;
+}
+
+.meta-label {
+    color: #8996a3;
+    font-size: 11px;
+}
+
+.meta-value {
+    margin-top: 7px;
+    font-weight: bold;
+}
+
+@media (max-width: 900px) {
+    .sidebar {
+        position: static;
+        width: 100%;
+        height: auto;
+    }
+
+    .content {
+        margin-left: 0;
+    }
+
+    .meta {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
+</head>
+
+<body>
+
+<div class="sidebar">
+    <div class="logo">
+        WiFi<span>-Trace</span>
+    </div>
+
+    <div class="menu">
+        <a href="/">▣ Overview</a>
+        <a href="/networks">◉ Networks</a>
+        <a href="/devices">◈ Devices</a>
+        <a href="/timeline">⌚ Timeline</a>
+        <a href="/time-machine">◫ Time Machine</a>
+        <a href="/network-diff">⇄ Network Diff</a>
+        <a
+            class="active"
+            href="/investigations"
+        >
+            ◇ Investigations
+        </a>
+    </div>
+</div>
+
+<div class="content">
+
+    <div class="title">
+        {{ investigation.title }}
+    </div>
+
+    <div class="subtitle">
+        Investigation #{{ investigation.id }}
+    </div>
+
+    <div class="panel">
+
+        <div class="meta">
+
+            <div class="meta-card">
+                <div class="meta-label">
+                    STATUS
+                </div>
+
+                <div class="meta-value status">
+                    {{ investigation.status }}
+                </div>
+            </div>
+
+            <div class="meta-card">
+                <div class="meta-label">
+                    CREATED
+                </div>
+
+                <div
+                    class="meta-value local-time"
+                >
+                    {{ investigation.created_at }}
+                </div>
+            </div>
+
+            <div class="meta-card">
+                <div class="meta-label">
+                    EVIDENCE ITEMS
+                </div>
+
+                <div class="meta-value">
+                    {{ investigation.evidence|length }}
+                </div>
+            </div>
+
+        </div>
+
+        {% if investigation.description %}
+        <p class="note">
+            {{ investigation.description }}
+        </p>
+        {% endif %}
+
+    </div>
+
+    <div class="panel">
+        <h2>Add Snapshot Evidence</h2>
+
+        <form id="evidence-form">
+
+            <label>Historical Snapshot</label>
+
+            <select
+                name="snapshot_id"
+                required
+            >
+                {% for snapshot in snapshots %}
+                <option value="{{ snapshot.id }}">
+                    #{{ snapshot.id }}
+                    —
+                    {{ snapshot.observed_at }}
+                </option>
+                {% endfor %}
+            </select>
+
+            <label>Investigator Note</label>
+
+            <textarea
+                name="note"
+                maxlength="2000"
+                placeholder="Optional context for this evidence"
+            ></textarea>
+
+            <button type="submit">
+                Preserve Evidence
+            </button>
+
+        </form>
+
+        <p
+            id="message"
+            class="note"
+        ></p>
+
+        <p class="note">
+            The preserved payload receives a deterministic
+            SHA-256 integrity hash. Wi-Fi passwords and
+            credential fields are excluded from evidence.
+        </p>
+    </div>
+
+    <div class="panel">
+        <h2>Evidence Locker</h2>
+
+        {% if investigation.evidence %}
+
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Type</th>
+                    <th>Captured</th>
+                    <th>Source</th>
+                    <th>SHA-256</th>
+                    <th>Note</th>
+                </tr>
+            </thead>
+
+            <tbody>
+            {% for item in investigation.evidence %}
+                <tr>
+                    <td>
+                        #{{ item.id }}
+                    </td>
+
+                    <td>
+                        {{ item.evidence_type }}
+                    </td>
+
+                    <td class="local-time">
+                        {{ item.captured_at }}
+                    </td>
+
+                    <td>
+                        {{ item.source }}
+                    </td>
+
+                    <td class="hash">
+                        {{ item.sha256 }}
+                    </td>
+
+                    <td>
+                        {{ item.note or "—" }}
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+
+        {% else %}
+
+        <p class="note">
+            No evidence has been preserved in this
+            investigation yet.
+        </p>
+
+        {% endif %}
+    </div>
+
+</div>
+
+<script>
+function localizeTimes() {
+    document
+        .querySelectorAll(".local-time")
+        .forEach((element) => {
+            const date =
+                new Date(element.textContent.trim());
+
+            if (!Number.isNaN(date.getTime())) {
+                element.textContent =
+                    date.toLocaleString();
+            }
+        });
+}
+
+document.addEventListener(
+    "DOMContentLoaded",
+    localizeTimes
+);
+
+document
+    .getElementById("evidence-form")
+    .addEventListener(
+        "submit",
+        async (event) => {
+            event.preventDefault();
+
+            const message =
+                document.getElementById("message");
+
+            const response = await fetch(
+                "/api/investigations/" +
+                "{{ investigation.id }}" +
+                "/evidence/snapshot",
+                {
+                    method: "POST",
+                    body: new FormData(
+                        event.target
+                    ),
+                }
+            );
+
+            const data =
+                await response.json();
+
+            if (!response.ok) {
+                message.textContent =
+                    data.detail ||
+                    "Unable to preserve evidence.";
+                return;
+            }
+
+            window.location.reload();
+        }
+    );
+</script>
+
+</body>
+</html>

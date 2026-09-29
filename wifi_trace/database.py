@@ -1524,3 +1524,269 @@ def record_neighbor_mac_evidence(
         source=source,
         evidence_note=evidence_note,
     )
+
+
+# === WIFI-TRACE INVESTIGATIONS V1 ===
+
+def init_investigation_database() -> None:
+    init_device_database()
+
+    with get_connection() as connection:
+        connection.executescript(
+            """
+            CREATE TABLE IF NOT EXISTS investigations (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                title TEXT NOT NULL,
+                description TEXT,
+                status TEXT NOT NULL DEFAULT 'OPEN',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS investigation_evidence (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                investigation_id INTEGER NOT NULL,
+                evidence_type TEXT NOT NULL,
+                source TEXT NOT NULL,
+                captured_at TEXT NOT NULL,
+                added_at TEXT NOT NULL,
+                sha256 TEXT NOT NULL,
+                payload_json TEXT NOT NULL,
+                note TEXT,
+                FOREIGN KEY (
+                    investigation_id
+                ) REFERENCES investigations(id)
+            );
+
+            CREATE INDEX IF NOT EXISTS
+                idx_investigation_evidence_case
+            ON investigation_evidence(
+                investigation_id,
+                added_at
+            );
+
+            CREATE UNIQUE INDEX IF NOT EXISTS
+                idx_investigation_evidence_hash
+            ON investigation_evidence(
+                investigation_id,
+                sha256
+            );
+            """
+        )
+
+
+def create_investigation(
+    title: str,
+    description: str | None = None,
+) -> int:
+    from wifi_trace.evidence import utc_now
+
+    title = title.strip()
+
+    if not title:
+        raise ValueError(
+            "Investigation title is required."
+        )
+
+    description = (
+        description.strip()
+        if description
+        else None
+    )
+
+    now = utc_now()
+
+    init_investigation_database()
+
+    with get_connection() as connection:
+        cursor = connection.execute(
+            """
+            INSERT INTO investigations (
+                title,
+                description,
+                status,
+                created_at,
+                updated_at
+            )
+            VALUES (?, ?, 'OPEN', ?, ?)
+            """,
+            (
+                title,
+                description,
+                now,
+                now,
+            ),
+        )
+
+        return int(cursor.lastrowid)
+
+
+def get_investigations() -> list[dict]:
+    init_investigation_database()
+
+    with get_connection() as connection:
+        rows = connection.execute(
+            """
+            SELECT
+                i.*,
+                COUNT(e.id) AS evidence_count
+            FROM investigations AS i
+            LEFT JOIN investigation_evidence AS e
+                ON e.investigation_id = i.id
+            GROUP BY i.id
+            ORDER BY i.updated_at DESC, i.id DESC
+            """
+        ).fetchall()
+
+    return [
+        dict(row)
+        for row in rows
+    ]
+
+
+def get_investigation(
+    investigation_id: int,
+) -> dict | None:
+    init_investigation_database()
+
+    with get_connection() as connection:
+        row = connection.execute(
+            """
+            SELECT *
+            FROM investigations
+            WHERE id = ?
+            """,
+            (investigation_id,),
+        ).fetchone()
+
+        if row is None:
+            return None
+
+        evidence_rows = connection.execute(
+            """
+            SELECT *
+            FROM investigation_evidence
+            WHERE investigation_id = ?
+            ORDER BY added_at DESC, id DESC
+            """,
+            (investigation_id,),
+        ).fetchall()
+
+    investigation = dict(row)
+    investigation["evidence"] = [
+        dict(item)
+        for item in evidence_rows
+    ]
+
+    return investigation
+
+
+def add_snapshot_to_investigation(
+    investigation_id: int,
+    snapshot_id: int,
+    note: str | None = None,
+) -> dict:
+    import json
+
+    from wifi_trace.evidence import (
+        build_evidence_envelope,
+        utc_now,
+    )
+
+    investigation = get_investigation(
+        investigation_id
+    )
+
+    if investigation is None:
+        raise ValueError(
+            "Investigation not found."
+        )
+
+    snapshot = get_snapshot(snapshot_id)
+
+    if snapshot is None:
+        raise ValueError(
+            "Snapshot not found."
+        )
+
+    envelope = build_evidence_envelope(
+        evidence_type="network_snapshot",
+        source="WiFi-Trace Time Machine",
+        captured_at=snapshot.get(
+            "observed_at"
+        ),
+        payload=snapshot,
+    )
+
+    note = note.strip() if note else None
+
+    init_investigation_database()
+
+    with get_connection() as connection:
+        existing = connection.execute(
+            """
+            SELECT id
+            FROM investigation_evidence
+            WHERE investigation_id = ?
+              AND sha256 = ?
+            """,
+            (
+                investigation_id,
+                envelope["sha256"],
+            ),
+        ).fetchone()
+
+        if existing is not None:
+            raise ValueError(
+                "This evidence is already in the investigation."
+            )
+
+        cursor = connection.execute(
+            """
+            INSERT INTO investigation_evidence (
+                investigation_id,
+                evidence_type,
+                source,
+                captured_at,
+                added_at,
+                sha256,
+                payload_json,
+                note
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                investigation_id,
+                envelope["evidence_type"],
+                envelope["source"],
+                envelope["captured_at"],
+                utc_now(),
+                envelope["sha256"],
+                json.dumps(
+                    envelope["payload"],
+                    sort_keys=True,
+                    separators=(",", ":"),
+                    ensure_ascii=False,
+                ),
+                note,
+            ),
+        )
+
+        connection.execute(
+            """
+            UPDATE investigations
+            SET updated_at = ?
+            WHERE id = ?
+            """,
+            (
+                utc_now(),
+                investigation_id,
+            ),
+        )
+
+    return {
+        "evidence_id": int(
+            cursor.lastrowid
+        ),
+        "sha256": envelope["sha256"],
+    }
