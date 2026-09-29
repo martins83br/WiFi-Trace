@@ -885,3 +885,642 @@ def get_device_passport(device_id: int) -> dict | None:
     result["ip_history"] = [dict(row) for row in ips]
 
     return result
+
+
+def init_device_fingerprinting_database() -> None:
+    init_device_database()
+
+    with get_connection() as connection:
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS device_fingerprints (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                device_id INTEGER NOT NULL,
+                observed_at TEXT NOT NULL,
+                source TEXT NOT NULL,
+                hostname TEXT,
+                category TEXT,
+                confidence TEXT,
+                service_type TEXT,
+                service_name TEXT,
+                service_label TEXT,
+                port INTEGER,
+                FOREIGN KEY(device_id)
+                    REFERENCES observed_devices(id)
+            )
+            """
+        )
+
+        connection.execute(
+            """
+            CREATE INDEX IF NOT EXISTS
+            idx_device_fingerprints_device_time
+            ON device_fingerprints(device_id, observed_at)
+            """
+        )
+
+
+def add_device_fingerprint(
+    *,
+    device_id: int,
+    source: str,
+    hostname: str | None = None,
+    category: str | None = None,
+    confidence: str | None = None,
+    service_type: str | None = None,
+    service_name: str | None = None,
+    service_label: str | None = None,
+    port: int | None = None,
+) -> None:
+    init_device_fingerprinting_database()
+
+    observed_at = utc_now()
+
+    with get_connection() as connection:
+        connection.execute(
+            """
+            INSERT INTO device_fingerprints (
+                device_id,
+                observed_at,
+                source,
+                hostname,
+                category,
+                confidence,
+                service_type,
+                service_name,
+                service_label,
+                port
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                device_id,
+                observed_at,
+                source,
+                hostname,
+                category,
+                confidence,
+                service_type,
+                service_name,
+                service_label,
+                port,
+            ),
+        )
+
+
+def find_observed_device_by_ip(
+    ip_address: str,
+) -> dict | None:
+    init_device_database()
+
+    with get_connection() as connection:
+        connection.row_factory = sqlite3.Row
+
+        row = connection.execute(
+            """
+            SELECT
+                d.*
+            FROM observed_devices d
+            JOIN device_observations o
+                ON o.device_id = d.id
+            WHERE o.ip_address = ?
+            ORDER BY o.observed_at DESC
+            LIMIT 1
+            """,
+            (ip_address,),
+        ).fetchone()
+
+    return dict(row) if row else None
+
+
+def get_device_fingerprints(
+    device_id: int,
+) -> list[dict]:
+    init_device_fingerprinting_database()
+
+    with get_connection() as connection:
+        connection.row_factory = sqlite3.Row
+
+        rows = connection.execute(
+            """
+            SELECT *
+            FROM device_fingerprints
+            WHERE device_id = ?
+            ORDER BY observed_at DESC
+            LIMIT 250
+            """,
+            (device_id,),
+        ).fetchall()
+
+    return [dict(row) for row in rows]
+
+
+def get_device_identification(
+    device_id: int,
+) -> dict:
+    fingerprints = get_device_fingerprints(device_id)
+
+    if not fingerprints:
+        return {
+            "category": "Unknown",
+            "confidence": None,
+            "hostname": None,
+            "services": [],
+        }
+
+    rank = {
+        "High": 3,
+        "Medium": 2,
+        "Low": 1,
+    }
+
+    best = max(
+        fingerprints,
+        key=lambda item: rank.get(
+            item.get("confidence"),
+            0,
+        ),
+    )
+
+    hostname = next(
+        (
+            item["hostname"]
+            for item in fingerprints
+            if item.get("hostname")
+        ),
+        None,
+    )
+
+    services = []
+
+    seen = set()
+
+    for item in fingerprints:
+        key = (
+            item.get("service_type"),
+            item.get("service_name"),
+        )
+
+        if key in seen:
+            continue
+
+        seen.add(key)
+
+        services.append(
+            {
+                "type": item.get("service_type"),
+                "name": item.get("service_name"),
+                "label": item.get("service_label"),
+                "port": item.get("port"),
+                "confidence": item.get("confidence"),
+            }
+        )
+
+    return {
+        "category": best.get("category") or "Unknown",
+        "confidence": best.get("confidence"),
+        "hostname": hostname,
+        "services": services,
+    }
+
+
+
+# === WIFI-TRACE DEVICE ENRICHMENT V1 ===
+
+def _fingerprint_service_weight(service_type: str | None) -> int:
+    weights = {
+        "_ipp._tcp": 100,
+        "_ipps._tcp": 100,
+        "_printer._tcp": 100,
+        "_pdl-datastream._tcp": 95,
+        "_scanner._tcp": 90,
+        "_googlecast._tcp": 80,
+        "_workstation._tcp": 75,
+        "_smb._tcp": 65,
+        "_ssh._tcp": 55,
+        "_airplay._tcp": 50,
+        "_raop._tcp": 45,
+        "_device-info._tcp": 20,
+        "_https._tcp": 10,
+        "_http._tcp": 5,
+    }
+
+    return weights.get(service_type or "", 0)
+
+
+def get_enriched_device_identification(
+    device: dict,
+) -> dict:
+    fingerprints = get_device_fingerprints(
+        device["id"]
+    )
+
+    services = []
+    seen = set()
+
+    for item in fingerprints:
+        key = (
+            item.get("service_type"),
+            item.get("service_name"),
+        )
+
+        if key in seen:
+            continue
+
+        seen.add(key)
+
+        services.append(
+            {
+                "type": item.get("service_type"),
+                "name": item.get("service_name"),
+                "label": item.get("service_label"),
+                "port": item.get("port"),
+                "confidence": item.get("confidence"),
+                "hostname": item.get("hostname"),
+            }
+        )
+
+    hostname = next(
+        (
+            item.get("hostname")
+            for item in fingerprints
+            if item.get("hostname")
+        ),
+        None,
+    )
+
+    # Direct local evidence outranks advertised services.
+    if device.get("device_type") == "Local Host":
+        return {
+            "display_name":
+                device.get("display_name")
+                or hostname
+                or "Local Computer",
+            "category": "Computer",
+            "confidence": "High",
+            "hostname":
+                hostname
+                or device.get("display_name"),
+            "services": services,
+            "fingerprint_count": len(fingerprints),
+        }
+
+    # Default route is direct evidence of the gateway role.
+    if device.get("device_type") == "Gateway":
+        return {
+            "display_name":
+                device.get("display_name")
+                or "Network Gateway",
+            "category": "Network Infrastructure",
+            "confidence": "High",
+            "hostname": hostname,
+            "services": services,
+            "fingerprint_count": len(fingerprints),
+        }
+
+    if not fingerprints:
+        return {
+            "display_name":
+                device.get("display_name")
+                or "Observed Device",
+            "category": "Unknown",
+            "confidence": None,
+            "hostname": None,
+            "services": [],
+            "fingerprint_count": 0,
+        }
+
+    service_types = {
+        item.get("service_type")
+        for item in fingerprints
+    }
+
+    printer_types = {
+        "_ipp._tcp",
+        "_ipps._tcp",
+        "_printer._tcp",
+        "_pdl-datastream._tcp",
+    }
+
+    # Printing + scanning is strong evidence for an MFP.
+    if (
+        service_types.intersection(printer_types)
+        and "_scanner._tcp" in service_types
+    ):
+        category = "Multifunction Printer"
+        confidence = "High"
+    else:
+        best = max(
+            fingerprints,
+            key=lambda item:
+                _fingerprint_service_weight(
+                    item.get("service_type")
+                ),
+        )
+
+        category = (
+            best.get("category")
+            or "Unknown"
+        )
+
+        confidence = best.get("confidence")
+
+    # Prefer a name attached to the strongest service evidence.
+    ranked = sorted(
+        fingerprints,
+        key=lambda item:
+            _fingerprint_service_weight(
+                item.get("service_type")
+            ),
+        reverse=True,
+    )
+
+    identified_name = None
+
+    for item in ranked:
+        candidate = item.get("service_name")
+
+        if candidate:
+            identified_name = candidate
+            break
+
+    return {
+        "display_name":
+            identified_name
+            or hostname
+            or device.get("display_name")
+            or "Observed Device",
+        "category": category,
+        "confidence": confidence,
+        "hostname": hostname,
+        "services": services,
+        "fingerprint_count": len(fingerprints),
+    }
+
+
+def get_enriched_observed_devices() -> list[dict]:
+    devices = get_observed_devices()
+    result = []
+
+    for device in devices:
+        identification = (
+            get_enriched_device_identification(
+                device
+            )
+        )
+
+        result.append(
+            {
+                **device,
+                "identified_name":
+                    identification["display_name"],
+                "category":
+                    identification["category"],
+                "confidence":
+                    identification["confidence"],
+                "identified_hostname":
+                    identification["hostname"],
+                "services":
+                    identification["services"],
+                "fingerprint_count":
+                    identification["fingerprint_count"],
+            }
+        )
+
+    return result
+
+
+def get_enriched_device_passport(
+    device_id: int,
+) -> dict | None:
+    passport = get_device_passport(device_id)
+
+    if passport is None:
+        return None
+
+    identification = (
+        get_enriched_device_identification(
+            passport
+        )
+    )
+
+    passport["identification"] = identification
+    passport["fingerprints"] = (
+        get_device_fingerprints(device_id)
+    )
+
+    return passport
+
+
+
+# === WIFI-TRACE MAC PASSPORT ENRICHMENT V1 ===
+
+def get_device_mac_evidence(device_id: int) -> dict:
+    """
+    Return the most recent valid MAC evidence associated with a device.
+
+    A MAC address is evidence about an observed network interface.
+    It must not be treated as proof of a person's identity or current
+    network association.
+    """
+
+    from wifi_trace.mac_evidence import analyze_mac
+
+    init_device_database()
+
+    with get_connection() as connection:
+        rows = connection.execute(
+            """
+            SELECT
+                mac_address,
+                observed_at,
+                source
+            FROM device_observations
+            WHERE device_id = ?
+              AND mac_address IS NOT NULL
+              AND TRIM(mac_address) != ''
+            ORDER BY id DESC
+            LIMIT 50
+            """,
+            (device_id,),
+        ).fetchall()
+
+    for row in rows:
+        evidence = analyze_mac(row["mac_address"])
+
+        if not evidence.valid:
+            continue
+
+        result = evidence.to_dict()
+        result["observed_at"] = row["observed_at"]
+        result["source"] = row["source"]
+
+        return result
+
+    return {
+        "raw": None,
+        "normalized": None,
+        "valid": False,
+        "address_type": "Unavailable",
+        "administration": "Unavailable",
+        "locally_administered": None,
+        "globally_administered": None,
+        "multicast": None,
+        "unicast": None,
+        "oui": None,
+        "vendor_lookup_eligible": False,
+        "forensic_note": (
+            "No valid MAC-address evidence has been observed "
+            "for this device."
+        ),
+        "observed_at": None,
+        "source": None,
+    }
+
+
+def get_device_mac_history(
+    device_id: int,
+    limit: int = 100,
+) -> list[dict]:
+    """
+    Return unique valid MAC addresses observed for a device.
+    """
+
+    from wifi_trace.mac_evidence import analyze_mac
+
+    init_device_database()
+
+    limit = max(1, min(int(limit), 500))
+
+    with get_connection() as connection:
+        rows = connection.execute(
+            """
+            SELECT
+                mac_address,
+                MIN(observed_at) AS first_seen,
+                MAX(observed_at) AS last_seen,
+                COUNT(*) AS observations
+            FROM device_observations
+            WHERE device_id = ?
+              AND mac_address IS NOT NULL
+              AND TRIM(mac_address) != ''
+            GROUP BY mac_address
+            ORDER BY last_seen DESC
+            LIMIT ?
+            """,
+            (device_id, limit),
+        ).fetchall()
+
+    results = []
+
+    for row in rows:
+        evidence = analyze_mac(row["mac_address"])
+
+        if not evidence.valid:
+            continue
+
+        item = evidence.to_dict()
+        item["first_seen"] = row["first_seen"]
+        item["last_seen"] = row["last_seen"]
+        item["observations"] = row["observations"]
+
+        results.append(item)
+
+    return results
+
+
+def get_mac_enriched_device_passport(
+    device_id: int,
+) -> dict | None:
+    """
+    Return the enriched Device Passport plus MAC evidence.
+    """
+
+    device = get_enriched_device_passport(device_id)
+
+    if device is None:
+        return None
+
+    device["mac_evidence"] = get_device_mac_evidence(
+        device_id
+    )
+
+    device["mac_history"] = get_device_mac_history(
+        device_id
+    )
+
+    return device
+
+
+
+# === WIFI-TRACE NEIGHBOR EVIDENCE V1 ===
+
+def get_latest_observed_ipv4_addresses() -> list[str]:
+    """
+    Return unique IPv4 addresses already observed by WiFi-Trace.
+
+    This does not generate new targets.
+    """
+
+    init_device_database()
+
+    with get_connection() as connection:
+        rows = connection.execute(
+            """
+            SELECT DISTINCT ip_address
+            FROM device_observations
+            WHERE ip_address IS NOT NULL
+              AND TRIM(ip_address) != ''
+            ORDER BY ip_address
+            """
+        ).fetchall()
+
+    return [
+        row["ip_address"]
+        for row in rows
+        if row["ip_address"]
+    ]
+
+
+def record_neighbor_mac_evidence(
+    ip_address: str,
+    mac_address: str,
+    source: str,
+    evidence_note: str,
+) -> int | None:
+    """
+    Attach validated MAC evidence to the device most recently observed
+    at an IPv4 address.
+
+    Existing device identity is preserved. The MAC is stored as
+    observation evidence and does not automatically replace the
+    device_key.
+    """
+
+    from wifi_trace.mac_evidence import analyze_mac
+
+    evidence = analyze_mac(mac_address)
+
+    if not evidence.valid:
+        return None
+
+    if evidence.multicast:
+        return None
+
+    device = find_observed_device_by_ip(ip_address)
+
+    if device is None:
+        return None
+
+    return observe_device(
+        device_key=device["device_key"],
+        device_type=device["device_type"],
+        display_name=(
+            device.get("display_name")
+            or device["device_type"]
+        ),
+        ip_address=ip_address,
+        mac_address=evidence.normalized,
+        source=source,
+        evidence_note=evidence_note,
+    )

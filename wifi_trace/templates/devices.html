@@ -1,24 +1,38 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+>
 
 <title>Observed Devices | WiFi-Trace</title>
 
 <style>
-* { box-sizing: border-box; }
+* {
+    box-sizing: border-box;
+}
 
 body {
     margin: 0;
     background: #0b1118;
     color: #dce7f3;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-family:
+        -apple-system,
+        BlinkMacSystemFont,
+        "Segoe UI",
+        sans-serif;
 }
 
 a {
     color: inherit;
     text-decoration: none;
+}
+
+button {
+    font: inherit;
 }
 
 .layout {
@@ -64,7 +78,14 @@ a {
 
 .main {
     padding: 34px;
-    max-width: 1450px;
+    max-width: 1500px;
+}
+
+.header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 24px;
 }
 
 h1 {
@@ -75,6 +96,36 @@ h1 {
 .description {
     color: #7f91a3;
     margin: 0 0 25px;
+}
+
+.action-area {
+    text-align: right;
+}
+
+.action-button {
+    border: 1px solid #2c4657;
+    background: #172430;
+    color: #dce7f3;
+    border-radius: 7px;
+    padding: 10px 15px;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.action-button:hover {
+    border-color: #39d98a;
+}
+
+.action-button:disabled {
+    cursor: wait;
+    opacity: .65;
+}
+
+.action-status {
+    color: #718396;
+    font-size: 11px;
+    margin-top: 8px;
+    min-height: 15px;
 }
 
 .notice {
@@ -90,7 +141,8 @@ h1 {
 
 .stats {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns:
+        repeat(3, minmax(0, 1fr));
     gap: 14px;
     margin-bottom: 18px;
 }
@@ -140,15 +192,26 @@ th {
 td {
     padding: 15px 16px;
     border-bottom: 1px solid #192631;
+    vertical-align: middle;
 }
 
 tr:last-child td {
     border-bottom: 0;
 }
 
+tr:hover td {
+    background: #14202a;
+}
+
 .device-link {
     color: #39d98a;
-    font-weight: 600;
+    font-weight: 650;
+}
+
+.hostname {
+    color: #718396;
+    font-size: 11px;
+    margin-top: 4px;
 }
 
 .type {
@@ -160,8 +223,26 @@ tr:last-child td {
     font-size: 12px;
 }
 
+.confidence-high {
+    color: #39d98a;
+}
+
+.confidence-medium {
+    color: #e5c45b;
+}
+
+.confidence-low {
+    color: #9fb0c0;
+}
+
 .muted {
     color: #718396;
+}
+
+.source-extra {
+    color: #39d98a;
+    font-size: 11px;
+    margin-top: 4px;
 }
 
 .empty {
@@ -170,11 +251,33 @@ tr:last-child td {
     color: #718396;
 }
 
+@media (max-width: 1050px) {
+    .table-wrap {
+        overflow-x: auto;
+    }
+}
+
 @media (max-width: 900px) {
-    .layout { grid-template-columns: 1fr; }
-    .sidebar { display: none; }
-    .stats { grid-template-columns: 1fr; }
-    .table-wrap { overflow-x: auto; }
+    .layout {
+        grid-template-columns: 1fr;
+    }
+
+    .sidebar {
+        display: none;
+    }
+
+    .stats {
+        grid-template-columns: 1fr;
+    }
+
+    .header {
+        display: block;
+    }
+
+    .action-area {
+        text-align: left;
+        margin-bottom: 20px;
+    }
 }
 </style>
 </head>
@@ -189,9 +292,19 @@ tr:last-child td {
 
     <a class="nav-item" href="/">Overview</a>
     <a class="nav-item" href="/networks">Networks</a>
-    <a class="nav-item active" href="/devices">Devices</a>
+    <a
+        class="nav-item active"
+        href="/devices"
+    >
+        Devices
+    </a>
     <a class="nav-item" href="/timeline">Timeline</a>
-    <a class="nav-item" href="/time-machine">Time Machine</a>
+    <a
+        class="nav-item"
+        href="/time-machine"
+    >
+        Time Machine
+    </a>
     <a class="nav-item" href="#">Security</a>
     <a class="nav-item" href="#">Investigations</a>
     <a class="nav-item" href="#">Evidence</a>
@@ -200,33 +313,73 @@ tr:last-child td {
 
 <main class="main">
 
-<h1>Observed Devices</h1>
+<div class="header">
+    <div>
+        <h1>Observed Devices</h1>
 
-<p class="description">
-Devices supported by evidence collected by WiFi-Trace.
-</p>
+        <p class="description">
+            Devices supported by evidence collected
+            by WiFi-Trace.
+        </p>
+    </div>
+
+    <div class="action-area">
+        <button
+            id="identify-button"
+            class="action-button"
+            type="button"
+            onclick="identifyDevices()"
+        >
+            Identify Devices
+        </button>
+
+        <div
+            id="identify-status"
+            class="action-status"
+        ></div>
+    </div>
+</div>
 
 <div class="notice">
-This is an evidence view, not a claim that every device connected to the
-network has been discovered. WiFi-Trace only lists devices supported by
-available local or integrated data sources.
+    This is an evidence view, not a claim that every
+    device connected to the network has been discovered.
+    WiFi-Trace combines local observations, controlled
+    ICMP reachability and Bonjour/mDNS evidence when
+    available.
 </div>
 
 <div class="stats">
+
     <div class="stat">
-        <div class="stat-label">Observed Devices</div>
-        <div class="stat-value">{{ devices|length }}</div>
+        <div class="stat-label">
+            Observed Devices
+        </div>
+
+        <div class="stat-value">
+            {{ devices|length }}
+        </div>
     </div>
 
     <div class="stat">
-        <div class="stat-label">Collection Mode</div>
-        <div class="stat-value">Passive</div>
+        <div class="stat-label">
+            Collection Mode
+        </div>
+
+        <div class="stat-value">
+            Hybrid
+        </div>
     </div>
 
     <div class="stat">
-        <div class="stat-label">Evidence Model</div>
-        <div class="stat-value">Historical</div>
+        <div class="stat-label">
+            Evidence Model
+        </div>
+
+        <div class="stat-value">
+            Historical
+        </div>
     </div>
+
 </div>
 
 <div class="table-wrap">
@@ -237,9 +390,10 @@ available local or integrated data sources.
 <thead>
 <tr>
     <th>Device</th>
-    <th>Type</th>
+    <th>Category</th>
     <th>Latest IP</th>
-    <th>Source</th>
+    <th>Evidence</th>
+    <th>Confidence</th>
     <th>Observations</th>
     <th>Last Seen</th>
 </tr>
@@ -248,41 +402,73 @@ available local or integrated data sources.
 <tbody>
 
 {% for device in devices %}
+
 <tr>
-    <td>
-        <a
-            class="device-link"
-            href="/devices/{{ device.id }}"
-        >
-            {{ device.display_name or "Observed Device" }}
-        </a>
-    </td>
 
-    <td>
-        <span class="type">
-            {{ device.device_type }}
-        </span>
-    </td>
-
-    <td>
-        {{ device.latest_ip or "Unavailable" }}
-    </td>
-
-    <td>
-        {{ device.latest_source or "Unavailable" }}
-    </td>
-
-    <td>
-        {{ device.observation_count }}
-    </td>
-
-    <td
-        class="local-time"
-        data-utc="{{ device.last_seen }}"
+<td>
+    <a
+        class="device-link"
+        href="/devices/{{ device.id }}"
     >
-        {{ device.last_seen }}
-    </td>
+        {{ device.identified_name }}
+    </a>
+
+    {% if device.identified_hostname %}
+    <div class="hostname">
+        {{ device.identified_hostname }}
+    </div>
+    {% endif %}
+</td>
+
+<td>
+    <span class="type">
+        {{ device.category }}
+    </span>
+</td>
+
+<td>
+    {{ device.latest_ip or "Unavailable" }}
+</td>
+
+<td>
+    {{ device.latest_source or "Unavailable" }}
+
+    {% if device.services %}
+    <div class="source-extra">
+        + Bonjour/mDNS
+    </div>
+    {% endif %}
+</td>
+
+<td>
+    {% if device.confidence %}
+        <span
+            class="
+                confidence-{{ device.confidence|lower }}
+            "
+        >
+            {{ device.confidence }}
+        </span>
+    {% else %}
+        <span class="muted">
+            Unavailable
+        </span>
+    {% endif %}
+</td>
+
+<td>
+    {{ device.observation_count }}
+</td>
+
+<td
+    class="local-time"
+    data-utc="{{ device.last_seen }}"
+>
+    {{ device.last_seen }}
+</td>
+
 </tr>
+
 {% endfor %}
 
 </tbody>
@@ -291,7 +477,8 @@ available local or integrated data sources.
 {% else %}
 
 <div class="empty">
-No defensible device observations have been recorded yet.
+    No defensible device observations
+    have been recorded yet.
 </div>
 
 {% endif %}
@@ -302,13 +489,75 @@ No defensible device observations have been recorded yet.
 </div>
 
 <script>
-document.querySelectorAll(".local-time").forEach((element) => {
-    const date = new Date(element.dataset.utc);
+document
+    .querySelectorAll(".local-time")
+    .forEach((element) => {
+        const date =
+            new Date(element.dataset.utc);
 
-    if (!Number.isNaN(date.getTime())) {
-        element.textContent = date.toLocaleString();
+        if (!Number.isNaN(date.getTime())) {
+            element.textContent =
+                date.toLocaleString();
+        }
+    });
+
+
+async function identifyDevices() {
+    const button =
+        document.getElementById(
+            "identify-button"
+        );
+
+    const status =
+        document.getElementById(
+            "identify-status"
+        );
+
+    button.disabled = true;
+    button.textContent = "Identifying...";
+
+    status.textContent =
+        "Observing Bonjour/mDNS services...";
+
+    try {
+        const response = await fetch(
+            "/api/devices/bonjour",
+            {
+                method: "POST",
+                cache: "no-store",
+            }
+        );
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(
+                data.detail ||
+                "Device identification failed."
+            );
+        }
+
+        const matched =
+            Array.isArray(data.matched_devices)
+                ? data.matched_devices.length
+                : 0;
+
+        status.textContent =
+            `${matched} service evidence record(s) matched.`;
+
+        setTimeout(() => {
+            window.location.reload();
+        }, 500);
+
+    } catch (error) {
+        status.textContent =
+            `Error: ${error.message}`;
+
+        button.disabled = false;
+        button.textContent =
+            "Identify Devices";
     }
-});
+}
 </script>
 
 </body>

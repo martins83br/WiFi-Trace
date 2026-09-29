@@ -1,19 +1,29 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+>
 
 <title>Device Passport | WiFi-Trace</title>
 
 <style>
-* { box-sizing: border-box; }
+* {
+    box-sizing: border-box;
+}
 
 body {
     margin: 0;
     background: #0b1118;
     color: #dce7f3;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-family:
+        -apple-system,
+        BlinkMacSystemFont,
+        "Segoe UI",
+        sans-serif;
 }
 
 a {
@@ -97,7 +107,8 @@ h1 {
 
 .stats {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns:
+        repeat(3, minmax(0, 1fr));
     gap: 14px;
     margin-bottom: 18px;
 }
@@ -128,12 +139,18 @@ h1 {
 
 .grid {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns:
+        repeat(2, minmax(0, 1fr));
     gap: 16px;
+    margin-bottom: 16px;
 }
 
 .panel {
     overflow: hidden;
+}
+
+.panel.history {
+    margin-top: 16px;
 }
 
 .panel-title {
@@ -144,7 +161,7 @@ h1 {
 
 .row {
     display: grid;
-    grid-template-columns: 140px 1fr;
+    grid-template-columns: 150px 1fr;
     gap: 15px;
     padding: 11px 18px;
     border-bottom: 1px solid #192631;
@@ -159,8 +176,44 @@ h1 {
     font-size: 13px;
 }
 
-.history {
-    margin-top: 16px;
+.badge {
+    display: inline-block;
+    padding: 5px 9px;
+    border-radius: 14px;
+    background: #172430;
+    color: #9fb0c0;
+    font-size: 12px;
+}
+
+.high {
+    color: #39d98a;
+}
+
+.medium {
+    color: #e5c45b;
+}
+
+.low {
+    color: #9fb0c0;
+}
+
+.service {
+    padding: 13px 18px;
+    border-bottom: 1px solid #192631;
+}
+
+.service:last-child {
+    border-bottom: 0;
+}
+
+.service-name {
+    font-weight: 600;
+}
+
+.service-detail {
+    color: #718396;
+    font-size: 12px;
+    margin-top: 5px;
 }
 
 .observation {
@@ -188,12 +241,34 @@ h1 {
     color: #718396;
     font-size: 12px;
     margin-top: 5px;
+    line-height: 1.5;
+}
+
+.forensic-note {
+    padding: 15px 18px;
+    color: #8fa2b4;
+    line-height: 1.55;
+    font-size: 13px;
+    border-bottom: 1px solid #192631;
+}
+
+.forensic-note:last-child {
+    border-bottom: 0;
 }
 
 @media (max-width: 900px) {
-    .layout { grid-template-columns: 1fr; }
-    .sidebar { display: none; }
-    .grid, .stats { grid-template-columns: 1fr; }
+    .layout {
+        grid-template-columns: 1fr;
+    }
+
+    .sidebar {
+        display: none;
+    }
+
+    .grid,
+    .stats {
+        grid-template-columns: 1fr;
+    }
 }
 </style>
 </head>
@@ -208,9 +283,19 @@ h1 {
 
     <a class="nav-item" href="/">Overview</a>
     <a class="nav-item" href="/networks">Networks</a>
-    <a class="nav-item active" href="/devices">Devices</a>
+    <a
+        class="nav-item active"
+        href="/devices"
+    >
+        Devices
+    </a>
     <a class="nav-item" href="/timeline">Timeline</a>
-    <a class="nav-item" href="/time-machine">Time Machine</a>
+    <a
+        class="nav-item"
+        href="/time-machine"
+    >
+        Time Machine
+    </a>
     <a class="nav-item" href="#">Security</a>
     <a class="nav-item" href="#">Investigations</a>
     <a class="nav-item" href="#">Evidence</a>
@@ -219,20 +304,30 @@ h1 {
 
 <main class="main">
 
-<a class="back" href="/devices">← Observed Devices</a>
+<a class="back" href="/devices">
+    ← Observed Devices
+</a>
 
-<div class="passport-label">Device Passport</div>
+<div class="passport-label">
+    Device Passport
+</div>
 
-<h1>{{ device.display_name or "Observed Device" }}</h1>
+<h1>
+    {{ device.identification.display_name }}
+</h1>
 
 <p class="description">
-Historical identity and observation record based only on collected evidence.
+    Historical identity and observation record
+    based only on collected evidence.
 </p>
 
 <div class="stats">
 
 <div class="stat">
-    <div class="stat-label">First Seen</div>
+    <div class="stat-label">
+        First Seen
+    </div>
+
     <div
         class="stat-value local-time"
         data-utc="{{ device.first_seen }}"
@@ -242,7 +337,10 @@ Historical identity and observation record based only on collected evidence.
 </div>
 
 <div class="stat">
-    <div class="stat-label">Last Seen</div>
+    <div class="stat-label">
+        Last Seen
+    </div>
+
     <div
         class="stat-value local-time"
         data-utc="{{ device.last_seen }}"
@@ -252,7 +350,10 @@ Historical identity and observation record based only on collected evidence.
 </div>
 
 <div class="stat">
-    <div class="stat-label">Observations</div>
+    <div class="stat-label">
+        Observations
+    </div>
+
     <div class="stat-value">
         {{ device.observation_count }}
     </div>
@@ -260,14 +361,70 @@ Historical identity and observation record based only on collected evidence.
 
 </div>
 
+
 <div class="grid">
 
 <section class="panel">
 
-<div class="panel-title">Identity</div>
+<div class="panel-title">
+    Identification
+</div>
 
 <div class="row">
-    <div class="key">Device Type</div>
+    <div class="key">Category</div>
+
+    <div>
+        <span class="badge">
+            {{ device.identification.category }}
+        </span>
+    </div>
+</div>
+
+<div class="row">
+    <div class="key">Confidence</div>
+
+    <div
+        class="
+            {{ (device.identification.confidence or '')|lower }}
+        "
+    >
+        {{
+            device.identification.confidence
+            or "Unavailable"
+        }}
+    </div>
+</div>
+
+<div class="row">
+    <div class="key">Hostname</div>
+
+    <div>
+        {{
+            device.identification.hostname
+            or "Unavailable"
+        }}
+    </div>
+</div>
+
+<div class="row">
+    <div class="key">Vendor</div>
+
+    <div>
+        Unavailable
+    </div>
+</div>
+
+</section>
+
+
+<section class="panel">
+
+<div class="panel-title">
+    Identity Evidence
+</div>
+
+<div class="row">
+    <div class="key">Original Type</div>
     <div>{{ device.device_type }}</div>
 </div>
 
@@ -283,20 +440,78 @@ Historical identity and observation record based only on collected evidence.
 
 </section>
 
+</div>
+
 
 <section class="panel">
 
-<div class="panel-title">IP History</div>
+<div class="panel-title">
+    Observed Services
+</div>
+
+{% if device.identification.services %}
+
+{% for service in device.identification.services %}
+
+<div class="service">
+
+    <div class="service-name">
+        {{ service.label or service.type }}
+    </div>
+
+    <div class="service-detail">
+        {{ service.name }}
+
+        {% if service.port %}
+            · Port {{ service.port }}
+        {% endif %}
+
+        {% if service.confidence %}
+            · {{ service.confidence }} confidence
+        {% endif %}
+    </div>
+
+</div>
+
+{% endfor %}
+
+{% else %}
+
+<div class="service">
+    <div class="service-detail">
+        No Bonjour/mDNS service evidence
+        has been collected for this device.
+    </div>
+</div>
+
+{% endif %}
+
+</section>
+
+
+<div class="grid" style="margin-top:16px;">
+
+<section class="panel">
+
+<div class="panel-title">
+    IP History
+</div>
 
 {% if device.ip_history %}
 
 {% for item in device.ip_history %}
+
 <div class="row">
-    <div class="key">{{ item.ip_address }}</div>
+    <div class="key">
+        {{ item.ip_address }}
+    </div>
+
     <div>
-        {{ item.observations }} observation{% if item.observations != 1 %}s{% endif %}
+        {{ item.observations }}
+        observation{% if item.observations != 1 %}s{% endif %}
     </div>
 </div>
+
 {% endfor %}
 
 {% else %}
@@ -310,12 +525,41 @@ Historical identity and observation record based only on collected evidence.
 
 </section>
 
+
+<section class="panel">
+
+<div class="panel-title">
+    Forensic Interpretation
+</div>
+
+<div class="forensic-note">
+    Device classification is derived from available
+    evidence. Specific service advertisements are
+    weighted more strongly than generic services.
+</div>
+
+<div class="forensic-note">
+    ICMP reachability means that an IPv4 address
+    responded at the observation time. It does not
+    prove continuous connectivity or user identity.
+</div>
+
+<div class="forensic-note">
+    Vendor remains unavailable until WiFi-Trace
+    obtains reliable MAC-address evidence. Vendor
+    information is never guessed from IP address.
+</div>
+
+</section>
+
 </div>
 
 
 <section class="panel history">
 
-<div class="panel-title">Observation History</div>
+<div class="panel-title">
+    Observation History
+</div>
 
 {% for observation in device.observations %}
 
@@ -346,9 +590,11 @@ Historical identity and observation record based only on collected evidence.
     </div>
 
     {% if observation.evidence_note %}
+
     <div class="note">
         {{ observation.evidence_note }}
     </div>
+
     {% endif %}
 
 </div>
@@ -361,14 +607,135 @@ Historical identity and observation record based only on collected evidence.
 </div>
 
 <script>
-document.querySelectorAll(".local-time").forEach((element) => {
-    const date = new Date(element.dataset.utc);
+document
+    .querySelectorAll(".local-time")
+    .forEach((element) => {
+        const date =
+            new Date(element.dataset.utc);
 
-    if (!Number.isNaN(date.getTime())) {
-        element.textContent = date.toLocaleString();
-    }
-});
+        if (!Number.isNaN(date.getTime())) {
+            element.textContent =
+                date.toLocaleString();
+        }
+    });
 </script>
+
+
+<!-- WIFI-TRACE MAC EVIDENCE V1 -->
+<div class="panel">
+    <h2>MAC Evidence</h2>
+
+    {% if device.mac_evidence.valid %}
+    <table>
+        <tr>
+            <td>MAC Address</td>
+            <td>
+                {{ device.mac_evidence.normalized }}
+            </td>
+        </tr>
+
+        <tr>
+            <td>Address Type</td>
+            <td>
+                {{ device.mac_evidence.address_type }}
+            </td>
+        </tr>
+
+        <tr>
+            <td>Administration</td>
+            <td>
+                {{ device.mac_evidence.administration }}
+            </td>
+        </tr>
+
+        <tr>
+            <td>OUI</td>
+            <td>
+                {{ device.mac_evidence.oui
+                   or "Unavailable" }}
+            </td>
+        </tr>
+
+        <tr>
+            <td>Vendor Lookup</td>
+            <td>
+                {% if
+                    device.mac_evidence.vendor_lookup_eligible
+                %}
+                    Eligible
+                {% else %}
+                    Not reliable
+                {% endif %}
+            </td>
+        </tr>
+
+        <tr>
+            <td>Evidence Source</td>
+            <td>
+                {{ device.mac_evidence.source
+                   or "Unavailable" }}
+            </td>
+        </tr>
+    </table>
+
+    <p class="note">
+        {{ device.mac_evidence.forensic_note }}
+    </p>
+
+    {% else %}
+
+    <p class="note">
+        No valid MAC-address evidence has been observed
+        for this device.
+    </p>
+
+    {% endif %}
+</div>
+
+{% if device.mac_history %}
+<div class="panel">
+    <h2>MAC History</h2>
+
+    <table>
+        <thead>
+            <tr>
+                <th>MAC</th>
+                <th>Administration</th>
+                <th>OUI</th>
+                <th>Observations</th>
+                <th>Last Seen</th>
+            </tr>
+        </thead>
+
+        <tbody>
+        {% for mac in device.mac_history %}
+            <tr>
+                <td>
+                    {{ mac.normalized }}
+                </td>
+
+                <td>
+                    {{ mac.administration }}
+                </td>
+
+                <td>
+                    {{ mac.oui or "Unavailable" }}
+                </td>
+
+                <td>
+                    {{ mac.observations }}
+                </td>
+
+                <td class="local-time">
+                    {{ mac.last_seen }}
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
 
 </body>
 </html>

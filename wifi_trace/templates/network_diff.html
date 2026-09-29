@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1"
+    >
+
+    <title>Network Diff | WiFi-Trace</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            background: #0b1118;
+            color: #e6edf3;
+            font-family:
+                Arial,
+                Helvetica,
+                sans-serif;
+        }
+
+        .sidebar {
+            position: fixed;
+            width: 230px;
+            height: 100vh;
+            background: #101820;
+            border-right: 1px solid #263241;
+        }
+
+        .logo {
+            padding: 28px;
+            font-size: 25px;
+            font-weight: bold;
+        }
+
+        .logo span {
+            color: #39d98a;
+        }
+
+        .menu {
+            padding: 15px 25px;
+        }
+
+        .menu a {
+            display: block;
+            padding: 13px 0;
+            color: #9aa7b4;
+            text-decoration: none;
+        }
+
+        .menu a:hover,
+        .menu .active {
+            color: #39d98a;
+        }
+
+        .content {
+            margin-left: 230px;
+            padding: 40px;
+        }
+
+        .title {
+            font-size: 30px;
+            font-weight: bold;
+        }
+
+        .subtitle {
+            margin-top: 6px;
+            color: #8b98a5;
+        }
+
+        .panel {
+            margin-top: 28px;
+            padding: 24px;
+            background: #111b26;
+            border: 1px solid #243241;
+            border-radius: 10px;
+        }
+
+        .selectors {
+            display: grid;
+            grid-template-columns: 1fr 1fr auto;
+            gap: 18px;
+            align-items: end;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #8996a3;
+            font-size: 13px;
+            font-weight: bold;
+        }
+
+        select {
+            width: 100%;
+            padding: 11px;
+            background: #0b1118;
+            color: #e6edf3;
+            border: 1px solid #344455;
+            border-radius: 6px;
+        }
+
+        button {
+            padding: 11px 18px;
+            background: #39d98a;
+            color: #07120d;
+            border: 0;
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        button:hover {
+            opacity: 0.9;
+        }
+
+        .cards {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            margin-top: 25px;
+        }
+
+        .card {
+            padding: 18px;
+            background: #111b26;
+            border: 1px solid #243241;
+            border-radius: 9px;
+        }
+
+        .card-title {
+            color: #8996a3;
+            font-size: 12px;
+        }
+
+        .card-value {
+            margin-top: 8px;
+            font-size: 23px;
+            font-weight: bold;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th {
+            padding: 12px;
+            color: #8996a3;
+            text-align: left;
+            border-bottom: 1px solid #263241;
+        }
+
+        td {
+            padding: 14px 12px;
+            border-bottom: 1px solid #1d2935;
+            vertical-align: top;
+        }
+
+        .state {
+            display: inline-block;
+            padding: 5px 8px;
+            border-radius: 5px;
+            font-size: 11px;
+            font-weight: bold;
+        }
+
+        .UNCHANGED {
+            background: #1b2733;
+            color: #9aa7b4;
+        }
+
+        .CHANGED {
+            background: #3a3014;
+            color: #ffd866;
+        }
+
+        .ADDED {
+            background: #123524;
+            color: #39d98a;
+        }
+
+        .REMOVED {
+            background: #3b1d24;
+            color: #ff7b86;
+        }
+
+        .SIGNIFICANT {
+            background: #3b1d24;
+            color: #ff7b86;
+        }
+
+        .TELEMETRY {
+            background: #162b3d;
+            color: #79c0ff;
+        }
+
+        .summary {
+            margin-top: 25px;
+            padding: 18px 20px;
+            background: #111b26;
+            border: 1px solid #243241;
+            border-left: 4px solid #39d98a;
+            border-radius: 9px;
+            line-height: 1.6;
+        }
+
+        .section-title {
+            margin-top: 0;
+        }
+
+        .classification {
+            display: inline-block;
+            padding: 5px 8px;
+            border-radius: 5px;
+            font-size: 11px;
+            font-weight: bold;
+        }
+
+        .explanation {
+            margin-top: 5px;
+            color: #8996a3;
+            font-size: 12px;
+        }
+
+        .changed-row {
+            background: rgba(255, 216, 102, 0.025);
+        }
+
+        .snapshot-meta {
+            color: #8996a3;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+
+        .arrow {
+            color: #586878;
+            padding: 0 8px;
+        }
+
+        .empty {
+            color: #8996a3;
+            line-height: 1.6;
+        }
+
+        .note {
+            margin-top: 18px;
+            color: #8996a3;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+
+        @media (max-width: 1000px) {
+            .sidebar {
+                position: static;
+                width: 100%;
+                height: auto;
+            }
+
+            .content {
+                margin-left: 0;
+            }
+
+            .selectors,
+            .cards {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="sidebar">
+    <div class="logo">
+        WiFi<span>-Trace</span>
+    </div>
+
+    <div class="menu">
+        <a href="/">▣ Overview</a>
+        <a href="/networks">◉ Networks</a>
+        <a href="/devices">◈ Devices</a>
+        <a href="/timeline">⌚ Timeline</a>
+        <a href="/time-machine">◫ Time Machine</a>
+        <a class="active" href="/network-diff">
+            ⇄ Network Diff
+        </a>
+    </div>
+</div>
+
+<div class="content">
+
+    <div class="title">
+        Network Diff
+    </div>
+
+    <div class="subtitle">
+        Compare two historical network observations.
+    </div>
+
+    <div class="panel">
+        <form
+            method="get"
+            action="/network-diff"
+            id="diff-form"
+        >
+            <div class="selectors">
+
+                <div>
+                    <label for="before">
+                        BEFORE SNAPSHOT
+                    </label>
+
+                    <select
+                        id="before"
+                        name="before"
+                        required
+                    >
+                        {% for item in snapshots %}
+                        <option
+                            value="{{ item.id }}"
+                            {% if
+                                before_snapshot
+                                and
+                                item.id == before_snapshot.id
+                            %}
+                            selected
+                            {% endif %}
+                        >
+                            #{{ item.id }}
+                            —
+                            {{ item.observed_at }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div>
+                    <label for="after">
+                        AFTER SNAPSHOT
+                    </label>
+
+                    <select
+                        id="after"
+                        name="after"
+                        required
+                    >
+                        {% for item in snapshots %}
+                        <option
+                            value="{{ item.id }}"
+                            {% if
+                                after_snapshot
+                                and
+                                item.id == after_snapshot.id
+                            %}
+                            selected
+                            {% endif %}
+                        >
+                            #{{ item.id }}
+                            —
+                            {{ item.observed_at }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div>
+                    <button type="submit">
+                        Compare
+                    </button>
+                </div>
+
+            </div>
+        </form>
+
+        <div class="note">
+            Network Diff compares stored evidence only.
+            It does not modify historical snapshots or infer
+            unavailable values.
+        </div>
+    </div>
+
+    {% if comparison %}
+
+    <div class="cards">
+
+        <div class="card">
+            <div class="card-title">
+                SIGNIFICANT
+            </div>
+
+            <div class="card-value">
+                {{
+                    comparison
+                    .classification_counts
+                    .SIGNIFICANT
+                }}
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">
+                TELEMETRY
+            </div>
+
+            <div class="card-value">
+                {{
+                    comparison
+                    .classification_counts
+                    .TELEMETRY
+                }}
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">
+                ADDED / REMOVED
+            </div>
+
+            <div class="card-value">
+                {{
+                    comparison.counts.ADDED
+                    +
+                    comparison.counts.REMOVED
+                }}
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">
+                UNCHANGED
+            </div>
+
+            <div class="card-value">
+                {{
+                    comparison
+                    .classification_counts
+                    .UNCHANGED
+                }}
+            </div>
+        </div>
+
+    </div>
+
+    <div class="summary">
+        <strong>Forensic Interpretation</strong>
+        <br>
+        {{ comparison.summary }}
+    </div>
+
+    <div class="panel">
+
+        <h2>
+            Snapshot Comparison
+        </h2>
+
+        <div class="snapshot-meta">
+            Before:
+            #{{ comparison.before_snapshot.id }}
+            —
+            <span class="local-time">
+                {{ comparison.before_snapshot.observed_at }}
+            </span>
+
+            <br>
+
+            After:
+            #{{ comparison.after_snapshot.id }}
+            —
+            <span class="local-time">
+                {{ comparison.after_snapshot.observed_at }}
+            </span>
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Evidence</th>
+                    <th>Before</th>
+                    <th></th>
+                    <th>After</th>
+                    <th>State</th>
+                    <th>Classification</th>
+                </tr>
+            </thead>
+
+            <tbody>
+            {% for item in comparison.changes %}
+                <tr
+                    {% if item.state != "UNCHANGED" %}
+                    class="changed-row"
+                    {% endif %}
+                >
+                    <td>
+                        {{ item.label }}
+                    </td>
+
+                    <td>
+                        {{ item.before_display }}
+                    </td>
+
+                    <td class="arrow">
+                        →
+                    </td>
+
+                    <td>
+                        {{ item.after_display }}
+                    </td>
+
+                    <td>
+                        <span
+                            class="state {{ item.state }}"
+                        >
+                            {{ item.state }}
+                        </span>
+                    </td>
+
+                    <td>
+                        <span
+                            class="
+                                classification
+                                {{ item.classification }}
+                            "
+                        >
+                            {{ item.classification }}
+                        </span>
+
+                        {% if
+                            item.state != "UNCHANGED"
+                        %}
+                        <div class="explanation">
+                            {{ item.explanation }}
+                        </div>
+                        {% endif %}
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+
+    </div>
+
+    {% else %}
+
+    <div class="panel">
+        <div class="empty">
+            At least two historical snapshots are required
+            for Network Diff.
+        </div>
+    </div>
+
+    {% endif %}
+
+</div>
+
+<script>
+    function localizeTimes() {
+        document
+            .querySelectorAll(".local-time")
+            .forEach((element) => {
+                const raw = element.textContent.trim();
+
+                if (!raw) {
+                    return;
+                }
+
+                const date = new Date(raw);
+
+                if (Number.isNaN(date.getTime())) {
+                    return;
+                }
+
+                element.textContent =
+                    date.toLocaleString();
+            });
+    }
+
+    document.addEventListener(
+        "DOMContentLoaded",
+        localizeTimes
+    );
+
+    document
+        .getElementById("diff-form")
+        .addEventListener("submit", (event) => {
+            const before =
+                document.getElementById("before").value;
+
+            const after =
+                document.getElementById("after").value;
+
+            if (before === after) {
+                event.preventDefault();
+
+                alert(
+                    "Select two different snapshots."
+                );
+            }
+        });
+</script>
+
+</body>
+</html>

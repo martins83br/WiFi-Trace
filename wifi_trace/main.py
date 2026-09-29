@@ -557,12 +557,19 @@ def time_machine_api(snapshot_id: int):
     response.headers["Cache-Control"] = "no-store"
     return response
 
-from wifi_trace.database import get_observed_devices, get_device_passport, record_core_devices
+from wifi_trace.database import (
+    get_observed_devices,
+    get_device_passport,
+    record_core_devices,
+    get_enriched_observed_devices,
+    get_enriched_device_passport,
+    get_mac_enriched_device_passport,
+)
 
 
 @app.get("/devices")
 def devices_page(request: Request):
-    devices = get_observed_devices()
+    devices = get_enriched_observed_devices()
 
     return templates.TemplateResponse(
         request=request,
@@ -575,7 +582,9 @@ def devices_page(request: Request):
 
 @app.get("/devices/{device_id}")
 def device_passport_page(request: Request, device_id: int):
-    device = get_device_passport(device_id)
+    device = get_mac_enriched_device_passport(
+        device_id
+    )
 
     if device is None:
         return JSONResponse(
@@ -639,4 +648,290 @@ def discovery_status():
     )
 
     response.headers["Cache-Control"] = "no-store"
+    return response
+
+
+from wifi_trace.bonjour_discovery import discover_bonjour
+from wifi_trace.database import (
+    add_device_fingerprint,
+    find_observed_device_by_ip,
+    get_device_fingerprints,
+    get_device_identification,
+)
+
+
+@app.post("/api/devices/bonjour")
+def run_bonjour_discovery():
+    observations = discover_bonjour()
+
+    matched = []
+    unmatched = []
+
+    for observation in observations:
+        ip_address = observation.get("ip_address")
+
+        if not ip_address:
+            unmatched.append(observation)
+            continue
+
+        device = find_observed_device_by_ip(
+            ip_address
+        )
+
+        if not device:
+            unmatched.append(observation)
+            continue
+
+        add_device_fingerprint(
+            device_id=device["id"],
+            source="Bonjour/mDNS",
+            hostname=observation.get("hostname"),
+            category=observation.get("category"),
+            confidence=observation.get("confidence"),
+            service_type=observation.get("service_type"),
+            service_name=observation.get("service_name"),
+            service_label=observation.get("service_label"),
+            port=observation.get("port"),
+        )
+
+        matched.append(
+            {
+                "device_id": device["id"],
+                **observation,
+            }
+        )
+
+    response = JSONResponse(
+        content={
+            "observed_services": len(observations),
+            "matched_devices": matched,
+            "unmatched_services": unmatched,
+        }
+    )
+
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
+@app.get("/api/devices/{device_id}/fingerprint")
+def device_fingerprint(device_id: int):
+    response = JSONResponse(
+        content={
+            "identification":
+                get_device_identification(device_id),
+            "evidence":
+                get_device_fingerprints(device_id),
+        }
+    )
+
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
+
+# === WIFI-TRACE NEIGHBOR COLLECTION API V1 ===
+
+from wifi_trace.macos_neighbors import collect_neighbors
+from wifi_trace.database import (
+    get_latest_observed_ipv4_addresses,
+    record_neighbor_mac_evidence,
+)
+
+
+@app.post("/api/devices/neighbors")
+def collect_device_neighbors():
+    """
+    Collect local IP-to-MAC neighbor evidence only for IPv4 addresses
+    already observed by WiFi-Trace.
+    """
+
+    targets = get_latest_observed_ipv4_addresses()
+
+    observations = collect_neighbors(targets)
+
+    recorded = []
+    unavailable = []
+
+    for observation in observations:
+        if not observation.get("available"):
+            unavailable.append(observation)
+            continue
+
+        device_id = record_neighbor_mac_evidence(
+            ip_address=observation["ip_address"],
+            mac_address=observation["mac_address"],
+            source=observation["source"],
+            evidence_note=observation["note"],
+        )
+
+        if device_id is None:
+            unavailable.append(
+                {
+                    **observation,
+                    "available": False,
+                    "note": (
+                        "MAC evidence was collected, but no existing "
+                        "WiFi-Trace device could be correlated safely."
+                    ),
+                }
+            )
+            continue
+
+        recorded.append(
+            {
+                **observation,
+                "device_id": device_id,
+            }
+        )
+
+    response = JSONResponse(
+        content={
+            "targets": len(targets),
+            "observations": len(observations),
+            "recorded": recorded,
+            "unavailable": unavailable,
+        }
+    )
+
+    response.headers["Cache-Control"] = "no-store"
+
+    return response
+
+
+
+# === WIFI-TRACE NETWORK DIFF V1 ===
+
+from wifi_trace.network_diff import compare_snapshots
+
+
+def _resolve_diff_snapshots(
+    before_id: int | None,
+    after_id: int | None,
+):
+    """
+    Resolve two snapshots for comparison.
+
+    If IDs are omitted, use the two most recent snapshots.
+    """
+
+    snapshots = get_snapshot_index(limit=250)
+
+    if not snapshots:
+        return None, None
+
+    if after_id is None:
+        after_id = snapshots[0]["id"]
+
+    if before_id is None:
+        before_id = next(
+            (
+                item["id"]
+                for item in snapshots
+                if item["id"] < after_id
+            ),
+            None,
+        )
+
+    before = (
+        get_snapshot(before_id)
+        if before_id is not None
+        else None
+    )
+
+    after = (
+        get_snapshot(after_id)
+        if after_id is not None
+        else None
+    )
+
+    return before, after
+
+
+@app.get("/network-diff")
+def network_diff_page(
+    request: Request,
+    before: int | None = None,
+    after: int | None = None,
+):
+    snapshots = get_snapshot_index(limit=250)
+
+    before_snapshot, after_snapshot = (
+        _resolve_diff_snapshots(
+            before,
+            after,
+        )
+    )
+
+    comparison = None
+
+    if (
+        before_snapshot is not None
+        and after_snapshot is not None
+    ):
+        comparison = compare_snapshots(
+            before_snapshot,
+            after_snapshot,
+        )
+
+    return templates.TemplateResponse(
+        request=request,
+        name="network_diff.html",
+        context={
+            "snapshots": snapshots,
+            "before_snapshot": before_snapshot,
+            "after_snapshot": after_snapshot,
+            "comparison": comparison,
+        },
+    )
+
+
+@app.get("/api/network-diff")
+def network_diff_api(
+    before: int,
+    after: int,
+):
+    if before == after:
+        return JSONResponse(
+            status_code=400,
+            content={
+                "success": False,
+                "detail": (
+                    "Two different snapshots are required."
+                ),
+            },
+        )
+
+    before_snapshot = get_snapshot(before)
+    after_snapshot = get_snapshot(after)
+
+    if before_snapshot is None:
+        return JSONResponse(
+            status_code=404,
+            content={
+                "success": False,
+                "detail": "Before snapshot not found.",
+            },
+        )
+
+    if after_snapshot is None:
+        return JSONResponse(
+            status_code=404,
+            content={
+                "success": False,
+                "detail": "After snapshot not found.",
+            },
+        )
+
+    response = JSONResponse(
+        content={
+            "success": True,
+            "comparison": compare_snapshots(
+                before_snapshot,
+                after_snapshot,
+            ),
+        }
+    )
+
+    response.headers["Cache-Control"] = "no-store"
+
     return response
