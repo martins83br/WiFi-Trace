@@ -132,6 +132,29 @@ footer { color: var(--muted); margin-top: 30px; font-size: 12px; }
 }
 </style>
 
+
+<style>
+.analytics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 18px;
+  margin-top: 20px;
+}
+.analytics-card {
+  background: #0c1620;
+  border: 1px solid #243241;
+  border-radius: 12px;
+  padding: 18px;
+  min-width: 0;
+}
+.analytics-card h3 {
+  margin: 0 0 16px;
+  font-size: 15px;
+}
+.analytics-card canvas {
+  height: 230px;
+}
+</style>
 </head>
 <body>
 
@@ -205,14 +228,32 @@ footer { color: var(--muted); margin-top: 30px; font-size: 12px; }
     <div id="findings" class="muted">Waiting for observations...</div>
   </section>
 
-  
+
 <section class="panel">
   <h2>Live Wireless Telemetry</h2>
   <p class="muted">
     Session history sampled every 10 seconds.
     Missing measurements create gaps.
   </p>
-  <canvas id="telemetry-chart" class="telemetry-chart"></canvas>
+
+<div class="analytics-grid">
+  <div class="analytics-card">
+    <h3>Signal Strength · RSSI</h3>
+    <canvas id="rssi-chart" class="telemetry-chart"></canvas>
+  </div>
+  <div class="analytics-card">
+    <h3>Signal-to-Noise Ratio · SNR</h3>
+    <canvas id="snr-chart" class="telemetry-chart"></canvas>
+  </div>
+  <div class="analytics-card">
+    <h3>Transmit Link Rate</h3>
+    <canvas id="rate-chart" class="telemetry-chart"></canvas>
+  </div>
+</div>
+<canvas id="telemetry-chart"
+        class="telemetry-chart"
+        style="display:none"></canvas>
+
   <div class="legend">
     <span><strong>●</strong> RSSI (dBm)</span>
     <span style="color:#5aa9ff">● SNR (dB)</span>
@@ -552,6 +593,143 @@ setInterval(refresh, 10000);
   };
 
   window.addEventListener("resize", drawChart);
+})();
+</script>
+
+
+<script>
+(() => {
+  const history = [];
+  const LIMIT = 60;
+
+  const definitions = [
+    ["rssi-chart", "signal_dbm", -100, -30, "#39d98a", "dBm"],
+    ["snr-chart", "snr_db", 0, 60, "#5aa9ff", "dB"],
+    ["rate-chart", "tx_rate_mbps", 0, 1200, "#f5bd4f", "Mbps"]
+  ];
+
+  function draw(canvasId, key, min, max, color, unit) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+
+    const width = canvas.clientWidth;
+    const height = canvas.clientHeight;
+    if (!width || !height) return;
+
+    const ratio = window.devicePixelRatio || 1;
+    canvas.width = Math.round(width * ratio);
+    canvas.height = Math.round(height * ratio);
+
+    const ctx = canvas.getContext("2d");
+    ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+    ctx.clearRect(0, 0, width, height);
+
+    const left = 48;
+    const right = width - 15;
+    const top = 20;
+    const bottom = height - 32;
+
+    ctx.font = "11px Arial";
+    ctx.lineWidth = 1;
+
+    for (let i = 0; i <= 4; i++) {
+      const value = max - ((max - min) * i / 4);
+      const y = top + ((bottom - top) * i / 4);
+
+      ctx.strokeStyle = "#243241";
+      ctx.beginPath();
+      ctx.moveTo(left, y);
+      ctx.lineTo(right, y);
+      ctx.stroke();
+
+      ctx.fillStyle = "#91a0ae";
+      ctx.fillText(String(Math.round(value)), 5, y + 4);
+    }
+
+    ctx.fillStyle = "#91a0ae";
+    ctx.fillText(unit, 5, 12);
+
+    if (!history.length) return;
+
+    const first = history[0].time;
+    const last = history[history.length - 1].time;
+    const windowStart = Math.max(first, last - 590000);
+    const duration = Math.max(1000, last - windowStart);
+
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+
+    let active = false;
+
+    history.forEach(sample => {
+      const value = sample.data[key];
+
+      if (
+        typeof value !== "number" ||
+        !Number.isFinite(value) ||
+        sample.time < windowStart
+      ) {
+        active = false;
+        return;
+      }
+
+      const x = left +
+        ((sample.time - windowStart) / duration) *
+        (right - left);
+
+      const normalized = Math.max(
+        0, Math.min(1, (value - min) / (max - min))
+      );
+
+      const y = bottom -
+        normalized * (bottom - top);
+
+      if (!active) {
+        ctx.moveTo(x, y);
+        active = true;
+      } else {
+        ctx.lineTo(x, y);
+      }
+    });
+
+    ctx.stroke();
+
+    const formatTime = time =>
+      new Date(time).toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit"
+      });
+
+    ctx.fillStyle = "#91a0ae";
+    ctx.fillText(formatTime(windowStart), left, height - 8);
+
+    const endLabel = formatTime(last);
+    const endWidth = ctx.measureText(endLabel).width;
+    ctx.fillText(endLabel, right - endWidth, height - 8);
+  }
+
+  function redraw() {
+    definitions.forEach(definition => draw(...definition));
+  }
+
+  const previousRender = window.render;
+
+  window.render = function(payload) {
+    previousRender(payload);
+
+    history.push({
+      time: Date.now(),
+      data: payload.diagnostics || {}
+    });
+
+    if (history.length > LIMIT) history.shift();
+
+    redraw();
+  };
+
+  window.addEventListener("resize", redraw);
 })();
 </script>
 
