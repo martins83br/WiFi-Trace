@@ -162,6 +162,8 @@ def collect_network_info() -> dict:
         "gateway": route["gateway"],
         "dns_servers": get_dns_servers(),
         **wifi,
+        "signal": signal,
+        "noise": noise,
     }
 
 
