@@ -5,6 +5,8 @@ from datetime import datetime, timezone
 
 from wifi_trace.collectors.macos import collect_network_info
 from wifi_trace.database import record_core_devices, save_snapshot
+from wifi_trace.wifi_diagnostics import analyze_wifi
+from wifi_trace.wireless_history import save_wireless_measurement
 
 
 class NetworkMonitor:
@@ -27,6 +29,10 @@ class NetworkMonitor:
 
             # Record only devices supported by direct local evidence.
             record_core_devices(network)
+
+            # Persist wireless telemetry using the existing monitor.
+            diagnostics = analyze_wifi(network)
+            save_wireless_measurement(network, diagnostics)
 
             with self._lock:
                 self.last_observation = datetime.now(

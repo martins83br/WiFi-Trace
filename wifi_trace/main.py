@@ -1672,10 +1672,8 @@ def wifi_diagnostics_api():
 
     network = collect_network_info()
 
-    from wifi_trace.wireless_history import save_wireless_measurement
 
     diagnostics = analyze_wifi(network)
-    save_wireless_measurement(network, diagnostics)
 
     return {
         "network": {
