@@ -256,6 +256,7 @@ WiFi<span>-Trace</span>
 
 <div class="menu">
 
+<a href="/wifi-diagnostics">◉ Wi-Fi Diagnostics</a>
 <a class="active" href="/">
 ▣ Overview
 </a>
@@ -1650,6 +1651,37 @@ def verify_investigation_api(
 from wifi_trace.risk_engine import (
     evaluate_network,
 )
+
+
+
+@app.get("/wifi-diagnostics", response_class=HTMLResponse)
+def wifi_diagnostics_page():
+    from pathlib import Path
+
+    template = (
+        Path(__file__).resolve().parent
+        / "templates"
+        / "wifi_diagnostics.html"
+    )
+    return HTMLResponse(template.read_text(encoding="utf-8"))
+
+
+@app.get("/api/wifi-diagnostics")
+def wifi_diagnostics_api():
+    from wifi_trace.wifi_diagnostics import analyze_wifi
+
+    network = collect_network_info()
+
+    return {
+        "network": {
+            "ssid": network.get("ssid"),
+            "interface": network.get("interface"),
+            "phy_mode": network.get("phy_mode"),
+            "channel": network.get("channel"),
+            "security": network.get("security"),
+        },
+        "diagnostics": analyze_wifi(network),
+    }
 
 
 @app.get("/api/network-health")

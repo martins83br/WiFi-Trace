@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wi-Fi Diagnostics | WiFi-Trace</title>
+<style>
+:root {
+  color-scheme: dark;
+  --bg: #0b1118;
+  --panel: #111b26;
+  --border: #243241;
+  --text: #e6edf3;
+  --muted: #91a0ae;
+  --green: #39d98a;
+  --yellow: #f5bd4f;
+  --red: #ff7474;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: Arial, Helvetica, sans-serif;
+}
+.sidebar {
+  position: fixed;
+  inset: 0 auto 0 0;
+  width: 230px;
+  padding: 28px 24px;
+  background: #101820;
+  border-right: 1px solid var(--border);
+}
+.logo { font-size: 25px; font-weight: bold; margin-bottom: 35px; }
+.logo span { color: var(--green); }
+nav a {
+  display: block;
+  padding: 12px 0;
+  color: var(--muted);
+  text-decoration: none;
+}
+nav a:hover, nav a.active { color: var(--green); }
+main { margin-left: 230px; padding: 40px; max-width: 1500px; }
+h1 { margin: 0; font-size: 30px; }
+.subtitle { color: var(--muted); margin: 10px 0 30px; }
+.grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 18px;
+}
+.card, .panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 24px;
+}
+.label { color: var(--muted); font-size: 13px; }
+.value { font-size: 30px; font-weight: bold; margin-top: 12px; }
+.quality { font-size: 12px; margin-top: 10px; font-weight: bold; }
+.good { color: var(--green); }
+.fair { color: var(--yellow); }
+.poor { color: var(--red); }
+.unknown { color: var(--muted); }
+.panel { margin-top: 24px; }
+.panel h2 { margin: 0 0 20px; font-size: 19px; }
+.meter {
+  height: 12px;
+  border-radius: 8px;
+  background: #253443;
+  overflow: hidden;
+  margin: 18px 0;
+}
+.fill {
+  height: 100%;
+  width: 0;
+  background: var(--green);
+  transition: width .5s ease;
+}
+.detail {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+.detail:last-child { border-bottom: 0; }
+.muted { color: var(--muted); }
+#status { font-size: 13px; color: var(--muted); }
+.notice {
+  border-left: 3px solid var(--yellow);
+  padding: 12px 16px;
+  background: #1b2530;
+  margin: 10px 0;
+  line-height: 1.5;
+}
+footer { color: var(--muted); margin-top: 30px; font-size: 12px; }
+@media (max-width: 1050px) {
+  .grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 700px) {
+  .sidebar { position: static; width: 100%; }
+  main { margin: 0; padding: 24px; }
+  .grid { grid-template-columns: 1fr; }
+}
+</style>
+
+<style>
+.telemetry-chart {
+  width: 100%;
+  height: 270px;
+  display: block;
+  background: #0c1620;
+  border: 1px solid #243241;
+  border-radius: 10px;
+}
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  margin: 15px 0;
+  color: #91a0ae;
+  font-size: 13px;
+}
+.legend strong { color: #39d98a; }
+.intelligence {
+  padding: 14px 16px;
+  margin: 10px 0;
+  background: #152331;
+  border-left: 3px solid #39d98a;
+  border-radius: 4px;
+  line-height: 1.6;
+}
+</style>
+
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="logo">WiFi<span>-Trace</span></div>
+  <nav>
+    <a href="/">▣ Overview</a>
+    <a href="/networks">◉ Networks</a>
+    <a href="/devices">◈ Devices</a>
+    <a href="/timeline">⌚ Timeline</a>
+    <a href="/time-machine">◫ Time Machine</a>
+    <a href="/network-diff">⇄ Network Diff</a>
+    <a href="/investigations">◇ Investigations</a>
+    <a class="active" href="/wifi-diagnostics">◉ Wi-Fi Diagnostics</a>
+  </nav>
+</aside>
+
+<main>
+  <h1>Wi-Fi Diagnostics</h1>
+  <p class="subtitle">
+    Live wireless signal intelligence and connection quality analysis.
+  </p>
+
+  <section class="grid">
+    <div class="card">
+      <div class="label">Signal Strength</div>
+      <div class="value" id="signal">—</div>
+      <div class="quality" id="signal-quality">UNAVAILABLE</div>
+    </div>
+    <div class="card">
+      <div class="label">Noise Level</div>
+      <div class="value" id="noise">—</div>
+      <div class="quality muted">Observed radio noise</div>
+    </div>
+    <div class="card">
+      <div class="label">Signal-to-Noise Ratio</div>
+      <div class="value" id="snr">—</div>
+      <div class="quality" id="snr-quality">UNAVAILABLE</div>
+    </div>
+    <div class="card">
+      <div class="label">Transmit Link Rate</div>
+      <div class="value" id="rate">—</div>
+      <div class="quality muted">Not Internet speed</div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Signal Quality</h2>
+    <div class="meter"><div class="fill" id="signal-meter"></div></div>
+    <div class="detail">
+      <span class="muted">Signal assessment</span>
+      <strong id="signal-assessment">Waiting for data</strong>
+    </div>
+    <div class="detail">
+      <span class="muted">SNR assessment</span>
+      <strong id="snr-assessment">Waiting for data</strong>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Connection Details</h2>
+    <div class="detail"><span class="muted">SSID</span><strong id="ssid">—</strong></div>
+    <div class="detail"><span class="muted">Interface</span><strong id="interface">—</strong></div>
+    <div class="detail"><span class="muted">Wi-Fi Standard</span><strong id="phy">—</strong></div>
+    <div class="detail"><span class="muted">Channel</span><strong id="channel">—</strong></div>
+    <div class="detail"><span class="muted">Security</span><strong id="security">—</strong></div>
+  </section>
+
+  <section class="panel">
+    <h2>Diagnostic Findings</h2>
+    <div id="findings" class="muted">Waiting for observations...</div>
+  </section>
+
+  
+<section class="panel">
+  <h2>Live Wireless Telemetry</h2>
+  <p class="muted">
+    Session history sampled every 10 seconds.
+    Missing measurements create gaps.
+  </p>
+  <canvas id="telemetry-chart" class="telemetry-chart"></canvas>
+  <div class="legend">
+    <span><strong>●</strong> RSSI (dBm)</span>
+    <span style="color:#5aa9ff">● SNR (dB)</span>
+    <span style="color:#f5bd4f">● Link Rate (Mbps)</span>
+  </div>
+  <p class="muted">
+    Each metric is normalized to its own display scale.
+    The lines are not directly comparable.
+  </p>
+</section>
+
+<section class="panel">
+  <h2>Wireless Stability</h2>
+  <div class="detail">
+    <span class="muted">Stability status</span>
+    <strong id="stability-status">Collecting samples</strong>
+  </div>
+  <div class="detail">
+    <span class="muted">Valid signal samples</span>
+    <strong id="sample-count">0</strong>
+  </div>
+  <div class="detail">
+    <span class="muted">Observed RSSI range</span>
+    <strong id="signal-range">—</strong>
+  </div>
+  <div class="detail">
+    <span class="muted">Significant signal changes</span>
+    <strong id="signal-changes">0</strong>
+  </div>
+</section>
+
+<section class="panel">
+  <h2>Wireless Intelligence</h2>
+  <div id="wireless-intelligence" class="muted">
+    Waiting for sufficient observations...
+  </div>
+</section>
+
+<footer>
+    <div id="status">Connecting to diagnostics engine...</div>
+    <p>
+      Measurements reflect local macOS telemetry. Missing values are not
+      inferred. This page does not measure Internet throughput or prove
+      that a network is secure.
+    </p>
+  </footer>
+</main>
+
+<script>
+const byId = id => document.getElementById(id);
+const text = (id, value) => { byId(id).textContent = value; };
+const available = value =>
+  value !== null && value !== undefined && value !== "";
+
+function qualityClass(value) {
+  if (value === "EXCELLENT" || value === "GOOD") return "good";
+  if (value === "FAIR") return "fair";
+  if (value === "POOR") return "poor";
+  return "unknown";
+}
+
+function setQuality(id, quality) {
+  const element = byId(id);
+  element.textContent = quality || "UNAVAILABLE";
+  element.className = "quality " + qualityClass(quality);
+}
+
+function render(data) {
+  const d = data.diagnostics || {};
+  const n = data.network || {};
+
+  text("signal", available(d.signal_dbm) ? d.signal_dbm + " dBm" : "—");
+  text("noise", available(d.noise_dbm) ? d.noise_dbm + " dBm" : "—");
+  text("snr", available(d.snr_db) ? d.snr_db + " dB" : "—");
+  text("rate", available(d.tx_rate_mbps) ? d.tx_rate_mbps + " Mbps" : "—");
+
+  setQuality("signal-quality", d.signal_quality);
+  setQuality("snr-quality", d.snr_quality);
+
+  text("signal-assessment", d.signal_quality || "UNAVAILABLE");
+  text("snr-assessment", d.snr_quality || "UNAVAILABLE");
+
+  const rssi = d.signal_dbm;
+  const percentage = typeof rssi === "number"
+    ? Math.max(0, Math.min(100, (rssi + 100) * 2))
+    : 0;
+
+  byId("signal-meter").style.width = percentage + "%";
+
+  text("ssid", n.ssid || "Unavailable (macOS restricted)");
+  text("interface", n.interface || "Unavailable");
+  text("phy", n.phy_mode || "Unavailable");
+  text("channel", n.channel || "Unavailable");
+  text("security", n.security || "Unavailable");
+
+  const container = byId("findings");
+  container.replaceChildren();
+
+  if (!Array.isArray(d.findings) || d.findings.length === 0) {
+    const item = document.createElement("p");
+    item.textContent = "No radio-quality warnings from this observation.";
+    container.appendChild(item);
+  } else {
+    d.findings.forEach(message => {
+      const item = document.createElement("div");
+      item.className = "notice";
+      item.textContent = message;
+      container.appendChild(item);
+    });
+  }
+
+  text("status", "Last updated: " + new Date().toLocaleTimeString());
+}
+
+async function refresh() {
+  try {
+    const response = await fetch("/api/wifi-diagnostics", {
+      cache: "no-store"
+    });
+    if (!response.ok) throw new Error("HTTP " + response.status);
+    render(await response.json());
+  } catch (error) {
+    text("status", "Diagnostics unavailable: " + error.message);
+  }
+}
+
+refresh();
+setInterval(refresh, 10000);
+</script>
+
+<script>
+(() => {
+  const MAX_SAMPLES = 60;
+  const samples = [];
+  const canvas = document.getElementById("telemetry-chart");
+  const ctx = canvas.getContext("2d");
+
+  const numberOrNull = value =>
+    typeof value === "number" && Number.isFinite(value)
+      ? value : null;
+
+  function addSample(d) {
+    samples.push({
+      time: Date.now(),
+      signal: numberOrNull(d.signal_dbm),
+      snr: numberOrNull(d.snr_db),
+      rate: numberOrNull(d.tx_rate_mbps)
+    });
+
+    if (samples.length > MAX_SAMPLES) samples.shift();
+
+    drawChart();
+    analyzeStability();
+  }
+
+  function drawChart() {
+    const width = canvas.clientWidth;
+    const height = canvas.clientHeight;
+
+    if (!width || !height) return;
+
+    const scale = window.devicePixelRatio || 1;
+    canvas.width = Math.round(width * scale);
+    canvas.height = Math.round(height * scale);
+    ctx.setTransform(scale, 0, 0, scale, 0, 0);
+
+    ctx.clearRect(0, 0, width, height);
+
+    const left = 35;
+    const right = width - 18;
+    const top = 18;
+    const bottom = height - 30;
+
+    ctx.strokeStyle = "#243241";
+    ctx.lineWidth = 1;
+
+    for (let i = 0; i <= 4; i++) {
+      const y = top + (bottom - top) * i / 4;
+      ctx.beginPath();
+      ctx.moveTo(left, y);
+      ctx.lineTo(right, y);
+      ctx.stroke();
+    }
+
+    function plot(key, color, minimum, maximum) {
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+
+      let started = false;
+
+      samples.forEach((sample, index) => {
+        const value = sample[key];
+
+        if (value === null) {
+          started = false;
+          return;
+        }
+
+        const x = left +
+          index * (right - left) / Math.max(1, MAX_SAMPLES - 1);
+
+        const normalized = Math.max(
+          0,
+          Math.min(1, (value - minimum) / (maximum - minimum))
+        );
+
+        const y = bottom - normalized * (bottom - top);
+
+        if (!started) {
+          ctx.moveTo(x, y);
+          started = true;
+        } else {
+          ctx.lineTo(x, y);
+        }
+      });
+
+      ctx.stroke();
+    }
+
+    plot("signal", "#39d98a", -100, -30);
+    plot("snr", "#5aa9ff", 0, 60);
+    plot("rate", "#f5bd4f", 0, 1200);
+
+    ctx.fillStyle = "#91a0ae";
+    ctx.font = "12px Arial";
+    ctx.fillText("Older", left, height - 8);
+    ctx.fillText("Latest", right - 35, height - 8);
+  }
+
+  function analyzeStability() {
+    const valid = samples
+      .map(s => s.signal)
+      .filter(v => v !== null);
+
+    document.getElementById("sample-count").textContent =
+      valid.length;
+
+    if (valid.length < 3) {
+      document.getElementById("stability-status").textContent =
+        "Collecting samples";
+      return;
+    }
+
+    const minimum = Math.min(...valid);
+    const maximum = Math.max(...valid);
+    const range = maximum - minimum;
+
+    let changes = 0;
+
+    for (let i = 1; i < samples.length; i++) {
+      const previous = samples[i - 1].signal;
+      const current = samples[i].signal;
+
+      if (
+        previous !== null &&
+        current !== null &&
+        Math.abs(current - previous) >= 10
+      ) {
+        changes++;
+      }
+    }
+
+    document.getElementById("signal-range").textContent =
+      minimum + " to " + maximum + " dBm";
+
+    document.getElementById("signal-changes").textContent =
+      changes;
+
+    let status = "STABLE";
+
+    if (range >= 20 || changes >= 3) {
+      status = "HIGH VARIATION";
+    } else if (range >= 10 || changes >= 1) {
+      status = "MODERATE VARIATION";
+    }
+
+    document.getElementById("stability-status").textContent =
+      status;
+
+    const messages = [];
+
+    if (status === "HIGH VARIATION") {
+      messages.push(
+        "Large RSSI variations were observed during this browser session. " +
+        "Check device movement, obstacles, and access point placement."
+      );
+    } else if (status === "MODERATE VARIATION") {
+      messages.push(
+        "Moderate RSSI variation was observed. Continue monitoring " +
+        "to determine whether the pattern persists."
+      );
+    } else {
+      messages.push(
+        "Recent RSSI measurements show limited variation."
+      );
+    }
+
+    const latest = samples[samples.length - 1];
+
+    if (latest.snr !== null && latest.snr < 15) {
+      messages.push(
+        "Low SNR observed. Interference or weak signal may affect reliability."
+      );
+    }
+
+    if (latest.signal !== null && latest.signal < -75) {
+      messages.push(
+        "Weak signal observed. Consider repositioning the device " +
+        "or reviewing access point coverage."
+      );
+    }
+
+    messages.push(
+      "These findings describe observed radio conditions, " +
+      "not proof of an attack or network compromise."
+    );
+
+    const container =
+      document.getElementById("wireless-intelligence");
+
+    container.replaceChildren();
+
+    messages.forEach(message => {
+      const item = document.createElement("div");
+      item.className = "intelligence";
+      item.textContent = message;
+      container.appendChild(item);
+    });
+  }
+
+  const originalRender = window.render;
+
+  window.render = function(data) {
+    originalRender(data);
+    addSample(data.diagnostics || {});
+  };
+
+  window.addEventListener("resize", drawChart);
+})();
+</script>
+
+</body>
+</html>
