@@ -1672,6 +1672,11 @@ def wifi_diagnostics_api():
 
     network = collect_network_info()
 
+    from wifi_trace.wireless_history import save_wireless_measurement
+
+    diagnostics = analyze_wifi(network)
+    save_wireless_measurement(network, diagnostics)
+
     return {
         "network": {
             "ssid": network.get("ssid"),
@@ -1680,7 +1685,26 @@ def wifi_diagnostics_api():
             "channel": network.get("channel"),
             "security": network.get("security"),
         },
-        "diagnostics": analyze_wifi(network),
+        "diagnostics": diagnostics,
+    }
+
+
+
+
+@app.get("/wireless-history", response_class=HTMLResponse)
+def wireless_history_page():
+    from pathlib import Path
+    path = Path(__file__).resolve().parent / "templates" / "wireless_history.html"
+    return HTMLResponse(path.read_text(encoding="utf-8"))
+
+
+@app.get("/api/wireless-history")
+def wireless_history_api(hours: int = 1, limit: int = 1000):
+    from wifi_trace.wireless_history import get_wireless_history
+
+    return {
+        "hours": max(1, min(hours, 168)),
+        "measurements": get_wireless_history(hours, limit),
     }
 
 

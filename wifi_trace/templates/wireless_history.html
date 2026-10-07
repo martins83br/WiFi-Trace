@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wireless History | WiFi-Trace</title>
+<style>
+:root {
+  color-scheme: dark;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: #080f18;
+  color: #e8eef7;
+}
+header {
+  padding: 24px 32px;
+  border-bottom: 1px solid #243447;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+h1 { margin: 0; font-size: 25px; }
+h2 { font-size: 17px; margin: 0 0 15px; }
+p { color: #98a9ba; }
+a { color: #79b8ff; text-decoration: none; }
+main { max-width: 1450px; margin: auto; padding: 28px; }
+nav { display: flex; gap: 16px; flex-wrap: wrap; }
+.controls {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+button {
+  background: #152638;
+  color: #dbe9f7;
+  border: 1px solid #34475b;
+  padding: 10px 18px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+button.active {
+  background: #155c9b;
+  border-color: #4aafff;
+}
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(310px, 1fr));
+  gap: 18px;
+}
+.card {
+  background: #101c29;
+  border: 1px solid #26384a;
+  border-radius: 14px;
+  padding: 20px;
+  min-width: 0;
+}
+canvas { display: block; width: 100%; height: 250px; }
+.value { font-size: 28px; font-weight: 700; }
+.muted { color: #93a7b9; font-size: 13px; }
+.summary { margin-bottom: 22px; }
+.status { margin-top: 16px; }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Wireless Historical Analytics</h1>
+    <p>Persistent wireless telemetry and historical signal analysis</p>
+  </div>
+  <nav>
+    <a href="/">Overview</a>
+    <a href="/wifi-diagnostics">Live Diagnostics</a>
+    <a href="/wireless-history">Wireless History</a>
+  </nav>
+</header>
+<main>
+  <div class="controls">
+    <button data-hours="1" class="active">Last Hour</button>
+    <button data-hours="24">24 Hours</button>
+    <button data-hours="168">7 Days</button>
+    <button id="refresh">Refresh</button>
+  </div>
+
+  <div class="card summary">
+    <h2>Historical Telemetry</h2>
+    <div class="value" id="count">—</div>
+    <div class="muted">Measurements available in selected period</div>
+    <div class="status muted" id="status">Loading...</div>
+  </div>
+
+  <div class="grid">
+    <section class="card">
+      <h2>Signal Strength · RSSI</h2>
+      <canvas id="rssi"></canvas>
+      <p class="muted" id="rssi-info"></p>
+    </section>
+    <section class="card">
+      <h2>Signal-to-Noise Ratio · SNR</h2>
+      <canvas id="snr"></canvas>
+      <p class="muted" id="snr-info"></p>
+    </section>
+    <section class="card">
+      <h2>Transmit Link Rate</h2>
+      <canvas id="rate"></canvas>
+      <p class="muted" id="rate-info"></p>
+    </section>
+  </div>
+  <p class="muted">
+    Historical charts show collected measurements only.
+    Missing data does not indicate a network outage.
+    Data is stored locally.
+  </p>
+</main>
+<script>
+let hours = 1;
+let measurements = [];
+
+const metrics = [
+  {id:"rssi", key:"signal_dbm", unit:"dBm", color:"#43d9a3"},
+  {id:"snr", key:"snr_db", unit:"dB", color:"#6aaeff"},
+  {id:"rate", key:"tx_rate_mbps", unit:"Mbps", color:"#ffc16b"}
+];
+
+function draw(metric) {
+  const canvas = document.getElementById(metric.id);
+  const rect = canvas.getBoundingClientRect();
+  const width = rect.width;
+  const height = rect.height;
+  if (!width || !height) return;
+
+  const ratio = window.devicePixelRatio || 1;
+  canvas.width = Math.round(width * ratio);
+  canvas.height = Math.round(height * ratio);
+
+  const ctx = canvas.getContext("2d");
+  ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+  ctx.clearRect(0, 0, width, height);
+
+  const points = measurements
+    .map(row => ({
+      time: Date.parse(row.timestamp),
+      value: row[metric.key]
+    }))
+    .filter(p => Number.isFinite(p.time) &&
+                 typeof p.value === "number" &&
+                 Number.isFinite(p.value));
+
+  const info = document.getElementById(metric.id + "-info");
+
+  if (!points.length) {
+    ctx.fillStyle = "#93a7b9";
+    ctx.font = "13px sans-serif";
+    ctx.fillText("No valid measurements", 20, height / 2);
+    info.textContent = "No data available";
+    return;
+  }
+
+  const values = points.map(p => p.value);
+  let min = Math.min(...values);
+  let max = Math.max(...values);
+  const padding = Math.max((max - min) * .15, 1);
+  min -= padding;
+  max += padding;
+
+  const left = 55, right = width - 16;
+  const top = 20, bottom = height - 38;
+  const start = Date.now() - hours * 3600000;
+  const end = Date.now();
+
+  ctx.font = "11px sans-serif";
+
+  for (let i = 0; i <= 4; i++) {
+    const y = top + (bottom - top) * i / 4;
+    const value = max - (max - min) * i / 4;
+
+    ctx.strokeStyle = "#26384a";
+    ctx.beginPath();
+    ctx.moveTo(left, y);
+    ctx.lineTo(right, y);
+    ctx.stroke();
+
+    ctx.fillStyle = "#93a7b9";
+    ctx.fillText(value.toFixed(0), 8, y + 4);
+  }
+
+  const x = t => left +
+    Math.max(0, Math.min(1, (t - start) / (end - start))) *
+    (right - left);
+
+  const y = v => bottom -
+    (v - min) / (max - min) * (bottom - top);
+
+  ctx.strokeStyle = metric.color;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+
+  points.forEach((p, index) => {
+    if (index === 0) ctx.moveTo(x(p.time), y(p.value));
+    else ctx.lineTo(x(p.time), y(p.value));
+  });
+
+  ctx.stroke();
+
+  ctx.fillStyle = "#93a7b9";
+  ctx.fillText(
+    new Date(start).toLocaleTimeString(),
+    left,
+    height - 10
+  );
+
+  const label = new Date(end).toLocaleTimeString();
+  ctx.fillText(
+    label,
+    right - ctx.measureText(label).width,
+    height - 10
+  );
+
+  const average = values.reduce((a,b) => a+b,0) / values.length;
+  info.textContent =
+    `Min: ${Math.min(...values).toFixed(1)} ${metric.unit} · ` +
+    `Max: ${Math.max(...values).toFixed(1)} ${metric.unit} · ` +
+    `Avg: ${average.toFixed(1)} ${metric.unit}`;
+}
+
+function redraw() {
+  metrics.forEach(draw);
+}
+
+async function loadHistory() {
+  const status = document.getElementById("status");
+  status.textContent = "Loading history...";
+
+  try {
+    const response = await fetch(
+      `/api/wireless-history?hours=${hours}&limit=5000`,
+      {cache:"no-store"}
+    );
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+    const payload = await response.json();
+    measurements = payload.measurements || [];
+
+    document.getElementById("count").textContent =
+      measurements.length.toLocaleString();
+
+    status.textContent = measurements.length
+      ? "Historical measurements loaded successfully."
+      : "No measurements recorded for this period yet.";
+
+    redraw();
+  } catch (error) {
+    status.textContent = `Unable to load history: ${error.message}`;
+  }
+}
+
+document.querySelectorAll("[data-hours]").forEach(button => {
+  button.addEventListener("click", () => {
+    hours = Number(button.dataset.hours);
+    document.querySelectorAll("[data-hours]").forEach(b =>
+      b.classList.toggle("active", b === button)
+    );
+    loadHistory();
+  });
+});
+
+document.getElementById("refresh")
+  .addEventListener("click", loadHistory);
+
+window.addEventListener("resize", redraw);
+loadHistory();
+setInterval(loadHistory, 30000);
+</script>
+</body>
+</html>
