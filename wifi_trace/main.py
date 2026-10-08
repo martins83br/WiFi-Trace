@@ -852,7 +852,6 @@ from fastapi.responses import JSONResponse
 from fastapi.templating import Jinja2Templates
 from wifi_trace.collectors.macos import (
     get_saved_wifi_networks,
-    get_saved_wifi_password,
 )
 
 templates = Jinja2Templates(directory="wifi_trace/templates")
@@ -869,29 +868,6 @@ def networks_page(request: Request):
     )
 
 
-@app.post("/api/networks/password")
-def network_password(ssid: str = Form(...)):
-    password = get_saved_wifi_password(ssid)
-
-    if password is None:
-        return JSONResponse(
-            status_code=404,
-            content={
-                "available": False,
-                "password": None,
-            },
-        )
-
-    return JSONResponse(
-        content={
-            "available": True,
-            "password": password,
-        },
-        headers={
-            "Cache-Control": "no-store, no-cache, must-revalidate",
-            "Pragma": "no-cache",
-        },
-    )
 
 
 from wifi_trace.database import init_database, save_snapshot, get_recent_events, get_database_stats

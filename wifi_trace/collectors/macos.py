@@ -192,35 +192,3 @@ def get_saved_wifi_networks() -> list[dict]:
         )
 
     return networks
-
-
-def get_saved_wifi_password(ssid: str) -> Optional[str]:
-    """Read one saved Wi-Fi credential from macOS Keychain."""
-    if not ssid or len(ssid) > 255:
-        return None
-
-    try:
-        result = subprocess.run(
-            [
-                "security",
-                "find-generic-password",
-                "-D",
-                "AirPort network password",
-                "-a",
-                ssid,
-                "-w",
-            ],
-            capture_output=True,
-            text=True,
-            timeout=30,
-            check=False,
-        )
-
-        if result.returncode != 0:
-            return None
-
-        password = result.stdout.rstrip("\r\n")
-        return password or None
-
-    except (OSError, subprocess.TimeoutExpired):
-        return None
