@@ -1767,3 +1767,7 @@ def wifi_trace_reports_page():
     from pathlib import Path
     path = Path(__file__).resolve().parent / "templates" / "reports.html"
     return HTMLResponse(path.read_text(encoding="utf-8"))
+
+
+from wifi_trace.report_exports import router as report_exports_router
+app.include_router(report_exports_router)
