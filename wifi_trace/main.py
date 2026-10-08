@@ -1746,3 +1746,24 @@ def network_health_api():
     ] = "no-store"
 
     return response
+
+
+@app.get("/security", response_class=HTMLResponse)
+def wifi_trace_security_page():
+    from pathlib import Path
+    path = Path(__file__).resolve().parent / "templates" / "security.html"
+    return HTMLResponse(path.read_text(encoding="utf-8"))
+
+
+@app.get("/evidence", response_class=HTMLResponse)
+def wifi_trace_evidence_page():
+    from pathlib import Path
+    path = Path(__file__).resolve().parent / "templates" / "evidence.html"
+    return HTMLResponse(path.read_text(encoding="utf-8"))
+
+
+@app.get("/reports", response_class=HTMLResponse)
+def wifi_trace_reports_page():
+    from pathlib import Path
+    path = Path(__file__).resolve().parent / "templates" / "reports.html"
+    return HTMLResponse(path.read_text(encoding="utf-8"))

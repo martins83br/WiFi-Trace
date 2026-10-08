@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reports Center | WiFi-Trace</title>
+<style>
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: #0b1118;
+  color: #e6edf3;
+  font-family: Arial, sans-serif;
+}
+aside {
+  width: 240px;
+  height: 100vh;
+  position: fixed;
+  overflow-y: auto;
+  background: #101820;
+  border-right: 1px solid #263241;
+  padding: 24px;
+}
+.logo {
+  font-size: 25px;
+  font-weight: bold;
+  margin-bottom: 28px;
+}
+.logo span { color: #39d98a; }
+nav a {
+  display: block;
+  padding: 11px 8px;
+  color: #a2afbd;
+  text-decoration: none;
+  border-radius: 6px;
+}
+nav a:hover, nav a.active {
+  color: #39d98a;
+  background: #162a27;
+}
+main {
+  margin-left: 240px;
+  padding: 45px;
+}
+h1 { font-size: 32px; }
+p { color: #9aa7b4; }
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 18px;
+  margin-top: 32px;
+}
+.card {
+  background: #111b26;
+  border: 1px solid #263241;
+  border-radius: 12px;
+  padding: 30px;
+  text-decoration: none;
+  color: #e6edf3;
+  font-size: 18px;
+}
+.card:hover { border-color: #39d98a; }
+@media(max-width:700px) {
+  aside { position: static; width: 100%; height: auto; }
+  main { margin-left: 0; padding: 24px; }
+}
+</style>
+</head>
+<body>
+<aside>
+<div class="logo">WiFi-<span>Trace</span></div>
+<nav><a href="/" class="">Overview</a>
+<a href="/networks" class="">Networks</a>
+<a href="/devices" class="">Devices</a>
+<a href="/timeline" class="">Timeline</a>
+<a href="/time-machine" class="">Time Machine</a>
+<a href="/network-diff" class="">Network Diff</a>
+<a href="/security" class="">Security</a>
+<a href="/investigations" class="">Investigations</a>
+<a href="/wifi-diagnostics" class="">Wi-Fi Diagnostics</a>
+<a href="/wireless-history" class="">Wireless History</a>
+<a href="/evidence" class="">Evidence</a>
+<a href="/reports" class="active">Reports</a></nav>
+</aside>
+<main>
+<h1>Reports Center</h1>
+<p>Explore available WiFi-Trace forensic and network analysis tools.</p>
+<div class="grid"><a class="card" href="/wireless-history">Wireless History →</a>
+<a class="card" href="/network-diff">Network Diff →</a>
+<a class="card" href="/security">Security Center →</a>
+<a class="card" href="/evidence">Evidence Center →</a></div>
+</main>
+</body>
+</html>
