@@ -1706,6 +1706,21 @@ def wireless_history_api(hours: int = 1, limit: int = 1000):
     }
 
 
+
+@app.get("/api/wireless-anomalies")
+def wireless_anomalies_api(hours: int = 1):
+    from wifi_trace.wireless_history import get_wireless_history
+    from wifi_trace.wireless_anomalies import detect_wireless_anomalies
+
+    hours = max(1, min(hours, 168))
+    measurements = get_wireless_history(hours=hours, limit=5000)
+
+    return {
+        "hours": hours,
+        **detect_wireless_anomalies(measurements),
+    }
+
+
 @app.get("/api/network-health")
 def network_health_api():
     network = collect_network_info()

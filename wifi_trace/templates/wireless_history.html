@@ -94,7 +94,16 @@ canvas { display: block; width: 100%; height: 250px; }
     <div class="status muted" id="status">Loading...</div>
   </div>
 
-  <div class="grid">
+
+  <section class="card summary" id="anomaly-panel">
+    <h2>Wireless Anomaly Intelligence</h2>
+    <div class="value" id="anomaly-status">Analyzing...</div>
+    <div class="muted" id="anomaly-count"></div>
+    <div id="anomaly-findings"></div>
+    <p class="muted" id="anomaly-disclaimer"></p>
+  </section>
+
+<div class="grid">
     <section class="card">
       <h2>Signal Strength · RSSI</h2>
       <canvas id="rssi"></canvas>
@@ -273,8 +282,73 @@ document.getElementById("refresh")
   .addEventListener("click", loadHistory);
 
 window.addEventListener("resize", redraw);
-loadHistory();
-setInterval(loadHistory, 30000);
+
+async function loadAnomalies() {
+  const status = document.getElementById("anomaly-status");
+  const count = document.getElementById("anomaly-count");
+  const container = document.getElementById("anomaly-findings");
+  const disclaimer = document.getElementById("anomaly-disclaimer");
+
+  try {
+    const response = await fetch(
+      `/api/wireless-anomalies?hours=${hours}`,
+      {cache: "no-store"}
+    );
+
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+    const data = await response.json();
+
+    status.textContent = data.status.toUpperCase();
+    count.textContent =
+      `${data.sample_count} measurements analyzed · ` +
+      `${data.findings.length} findings`;
+
+    disclaimer.textContent = data.disclaimer;
+    container.replaceChildren();
+
+    data.findings.forEach(finding => {
+      const item = document.createElement("div");
+      item.style.marginTop = "14px";
+      item.style.padding = "14px";
+      item.style.border = "1px solid #34475b";
+      item.style.borderRadius = "8px";
+
+      const heading = document.createElement("strong");
+      heading.textContent =
+        `${finding.severity.toUpperCase()} · ${finding.title}`;
+
+      const description = document.createElement("p");
+      description.textContent = finding.description;
+
+      item.append(heading, description);
+      container.appendChild(item);
+    });
+  } catch (error) {
+    status.textContent = "UNAVAILABLE";
+    count.textContent = error.message;
+    container.replaceChildren();
+  }
+}
+
+// Refresh historical telemetry and anomaly findings together.
+async function refreshDashboard() {
+  await Promise.all([
+    loadHistory(),
+    loadAnomalies()
+  ]);
+}
+
+document.querySelectorAll("[data-hours]").forEach(button => {
+  button.addEventListener("click", loadAnomalies);
+});
+
+document.getElementById("refresh")
+  .addEventListener("click", loadAnomalies);
+
+refreshDashboard();
+setInterval(refreshDashboard, 30000);
+
 </script>
 </body>
 </html>
